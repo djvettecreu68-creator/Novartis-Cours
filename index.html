@@ -637,6 +637,35 @@ function afficher(erreurMsg) {
 }
 
 async function telechargerJeu(jeu) {
+  // Si c'est le journalier, on utilise Stooq (très stable, pas de blocage)
+  if (jeu.cle === '1d') {
+    const texte = await lire('https://stooq.com/q/d/l/?s=nvs.us&i=d');
+    if (!texte || texte.includes('<html')) throw new Error('Stooq a renvoyé une page web au lieu des données.');
+    
+    const lignes = texte.trim().split('\n');
+    const points = [];
+    
+    // On ignore la première ligne (Date,Open,High,Low,Close,Volume)
+    for (let i = 1; i < lignes.length; i++) {
+      const cols = lignes[i].split(',');
+      if (cols.length >= 6 && cols[4] !== '') {
+        const ts = Math.floor(new Date(cols[0] + 'T14:30:00Z').getTime() / 1000);
+        points.push({
+          timestamp: ts,
+          open: parseFloat(cols[1]),
+          high: parseFloat(cols[2]),
+          low: parseFloat(cols[3]),
+          close: parseFloat(cols[4]),
+          adjclose: parseFloat(cols[4]), // Stooq ne fournit pas l'ajusté, on utilise le close
+          volume: parseInt(cols[5], 10)
+        });
+      }
+    }
+    if (!points.length) throw new Error('Aucun point extrait des données Stooq.');
+    return { points, devise: 'USD' };
+  }
+
+  // Pour l'horaire, on tente encore Yahoo (ou on renvoie une erreur si bloqué)
   const texte = await lire(urlCours(jeu));
   if (!texte || texte.trim() === '') throw new Error('Réponse vide.');
   if (texte.includes("Too Many Requests") || texte.includes("429")) throw new Error('Limite Yahoo atteinte (429).');
