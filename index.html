@@ -214,7 +214,6 @@ const JEUX = [
   { cle: '1d', interval: '1d', range: 'max', libelle: 'Journalier' },
   { cle: '1h', interval: '1h', range: '2y', libelle: 'Horaire' }
 ];
-function urlCours(jeu) { return 'https://query1.finance.yahoo.com/v8/finance/chart/NVS?range=' + jeu.range + '&interval=' + jeu.interval + '&includePrePost=false&events=div%2Csplits'; }
 const URL_NEWS_FR = 'https://news.google.com/rss/search?q=Novartis+when:7d&hl=fr&gl=FR&ceid=FR:fr';
 const URL_NEWS_EN = 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=NVS&region=US&lang=en-US';
 
@@ -257,7 +256,6 @@ function formaterDate(ts, intervalle) {
   return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' }) + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 }
 
-// ===== INDICATEURS TECHNIQUES =====
 function valeurPoint(p) { return p.adjclose != null ? p.adjclose : p.close; }
 function sma(points, n) {
   if (!points || points.length < n) return null;
@@ -340,7 +338,6 @@ function adx(points, n) {
   return adxVal;
 }
 
-// ===== MOTEUR DE DÉCISION =====
 function analyserTitre(titre) {
   const t = String(titre || '').toLowerCase();
   const pos = ['beat', 'raise', 'approval', 'success', 'growth', 'upgrade', 'profit', 'breakthrough', 'record', 'approuv', 'hausse', 'bénéfice', 'succès', 'positif'];
@@ -443,7 +440,6 @@ function lancerBacktest(journalier, horaire) {
   return { trades: trades, winRate: ((gagnants / trades) * 100).toFixed(1), gainMoyen: ((gainTotal / trades) * 100).toFixed(2) };
 }
 
-// ===== AFFICHAGE =====
 function afficherSignal(s) {
   const badge = document.getElementById('signal-badge');
   const expl = document.getElementById('signal-explication');
@@ -599,7 +595,6 @@ function afficher(erreurMsg) {
   const j1 = etat.jeux['1d'];
   const j2 = etat.jeux['1h'];
   
-  // On met à jour les champs de la VL même s'il n'y a pas de données
   mettreAJourVL(j1);
 
   if (!j1 || !j1.points || !j1.points.length) {
@@ -616,7 +611,6 @@ function afficher(erreurMsg) {
   afficherTableau(points, intervalle);
   afficherActus(etat.actus);
   
-  mettreAJourVL(j1);
   const s = calculerSignal(j1.points, j2 ? j2.points : j1.points, etat.actus);
   afficherSignal(s);
   
@@ -637,48 +631,32 @@ function afficher(erreurMsg) {
 }
 
 async function telechargerJeu(jeu) {
-  // Si c'est le journalier, on utilise Stooq (très stable, pas de blocage)
-  if (jeu.cle === '1d') {
-    const texte = await lire('https://stooq.com/q/d/l/?s=nvs.us&i=d');
-    if (!texte || texte.includes('<html')) throw new Error('Stooq a renvoyé une page web au lieu des données.');
-    
-    const lignes = texte.trim().split('\n');
-    const points = [];
-    
-    // On ignore la première ligne (Date,Open,High,Low,Close,Volume)
-    for (let i = 1; i < lignes.length; i++) {
-      const cols = lignes[i].split(',');
-      if (cols.length >= 6 && cols[4] !== '') {
-        const ts = Math.floor(new Date(cols[0] + 'T14:30:00Z').getTime() / 1000);
-        points.push({
-          timestamp: ts,
-          open: parseFloat(cols[1]),
-          high: parseFloat(cols[2]),
-          low: parseFloat(cols[3]),
-          close: parseFloat(cols[4]),
-          adjclose: parseFloat(cols[4]), // Stooq ne fournit pas l'ajusté, on utilise le close
-          volume: parseInt(cols[5], 10)
-        });
-      }
-    }
-    if (!points.length) throw new Error('Aucun point extrait des données Stooq.');
-    return { points, devise: 'USD' };
-  }
-
-  // Pour l'horaire, on tente encore Yahoo (ou on renvoie une erreur si bloqué)
-  const texte = await lire(urlCours(jeu));
+  // On alterne entre query1 et query2 pour éviter le blocage
+  const domain = Math.random() > 0.5 ? 'query1' : 'query2';
+  const url = 'https://' + domain + '.finance.yahoo.com/v8/finance/chart/NVS?range=' + jeu.range + '&interval=' + jeu.interval + '&includePrePost=false&events=div%2Csplits';
+  
+  const texte = await lire(url);
   if (!texte || texte.trim() === '') throw new Error('Réponse vide.');
-  if (texte.includes("Too Many Requests") || texte.includes("429")) throw new Error('Limite Yahoo atteinte (429).');
+  if (texte.includes("Too Many Requests") || texte.includes("429")) throw new Error('Yahoo est surchargé (429). Réessaie dans 1 min.');
   let data;
   try { data = JSON.parse(texte); } catch (e) { throw new Error('JSON invalide.'); }
   if (!data.chart || !data.chart.result || !data.chart.result[0]) throw new Error('Données introuvables.');
   const r = data.chart.result[0];
   const timestamps = r.timestamp || [];
   const q = r.indicators.quote[0] || {};
+  const adj = (r.indicators.adjclose && r.indicators.adjclose[0]) || {};
   const points = [];
   for (let i = 0; i < timestamps.length; i++) {
     if (q.close[i] == null) continue;
-    points.push({ timestamp: timestamps[i], open: q.open[i], high: q.high[i], low: q.low[i], close: q.close[i], volume: q.volume[i] });
+    points.push({ 
+      timestamp: timestamps[i], 
+      open: q.open ? q.open[i] : q.close[i], 
+      high: q.high ? q.high[i] : q.close[i], 
+      low: q.low ? q.low[i] : q.close[i], 
+      close: q.close[i], 
+      adjclose: adj.adjclose ? adj.adjclose[i] : q.close[i],
+      volume: q.volume ? q.volume[i] : 0 
+    });
   }
   return { points, devise: 'USD' };
 }
@@ -690,9 +668,8 @@ async function toutActualiser() {
   let faits = 0;
   const erreurs = [];
 
-  // 1. Téléchargement des cours (on garde le cache actuel en cas d'échec)
   for (const jeu of JEUX) {
-    document.getElementById('progression').textContent = 'Téléchargement ' + jeu.libelle + ' (' + jeu.range + ')…';
+    document.getElementById('progression').textContent = 'Téléchargement ' + jeu.libelle + '…';
     try {
       const data = await telechargerJeu(jeu);
       etat.jeux[jeu.cle] = { points: data.points, devise: data.devise, dateMax: Date.now() };
@@ -701,9 +678,10 @@ async function toutActualiser() {
     } catch (e) {
       erreurs.push(jeu.libelle + ' : ' + e.message);
     }
+    // Petite pause de 1.5s entre les requêtes pour ne pas se faire bloquer
+    await new Promise(r => setTimeout(r, 1500));
   }
 
-  // 3. Téléchargement des actualités
   document.getElementById('progression').textContent = 'Actualités…';
   try {
     etat.actus = await chargerActus();
@@ -715,7 +693,6 @@ async function toutActualiser() {
   bouton.disabled = false;
   document.getElementById('progression').textContent = '';
   
-  // 4. Affichage du résultat
   if (erreurs.length > 0) {
     afficher('❌ Erreur(s) : ' + erreurs.join(' | '));
   } else {
@@ -728,8 +705,6 @@ document.getElementById('vider').onclick = () => {
     localStorage.clear();
     etat.jeux = {};
     etat.actus = [];
-    
-    // Réinitialisation de l'interface sans recharger la page
     document.getElementById('vl_ref').value = '';
     document.getElementById('vl_date').value = '';
     document.getElementById('resultat_vl').innerHTML = 'Valeur actuelle estimée : <br><b style="font-size:1.4rem;color:var(--prim)">— €</b>';
@@ -737,7 +712,6 @@ document.getElementById('vider').onclick = () => {
     document.getElementById('progression').textContent = '';
     document.getElementById('backtest').textContent = '—';
     document.getElementById('actus').innerHTML = '';
-    
     afficher();
   }
 };
@@ -766,7 +740,6 @@ afficher();
 if (caseAuto.checked && window.Android && Android.activerServiceFond) Android.activerServiceFond(true);
 if (JEUX.every((j) => !etat.jeux[j.cle])) toutActualiser();
 
-// ===== CONTRÔLE QUALITÉ =====
 const normaliserEspaces = (s) => String(s).replace(/[\u202f\u00a0\u2009]/g, ' ');
 function controleQualite() {
   const cas = [
