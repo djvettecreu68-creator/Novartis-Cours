@@ -190,11 +190,11 @@ const progression = document.getElementById('progression');
 // 6 jeux de données : chacun a sa clé, sa fenêtre max et son libellé
 const JEUX = [
   { cle: '1d',  interval: '1d',  range: 'max',  libelle: 'Journalier (tout)' },
-  { cle: '1h',  interval: '1h',  range: '730d', libelle: 'Horaire (2 ans)' },
-  { cle: '30m', interval: '30m', range: '60d',  libelle: '30 minutes (60 j)' },
-  { cle: '15m', interval: '15m', range: '60d',  libelle: '15 minutes (60 j)' },
-  { cle: '5m',  interval: '5m',  range: '60d',  libelle: '5 minutes (60 j)' },
-  { cle: '1m',  interval: '1m',  range: '7d',   libelle: '1 minute (7 j)' },
+  { cle: '1h',  interval: '1h',  range: '2y',   libelle: 'Horaire (2 ans)' },
+  { cle: '30m', interval: '30m', range: '3mo',  libelle: '30 minutes (60 j)' },
+  { cle: '15m', interval: '15m', range: '3mo',  libelle: '15 minutes (60 j)' },
+  { cle: '5m',  interval: '5m',  range: '3mo',  libelle: '5 minutes (60 j)' },
+  { cle: '1m',  interval: '1m',  range: '1mo',  libelle: '1 minute (7 j)' },
 ];
 const PREFIXE_CACHE = 'novartis.v2.';
 const CLE_HORS_LIGNE = 'novartis.horsligne';
@@ -230,10 +230,12 @@ function ecrireCache(cle, data) {
 function filtrerPoints(points, periode, maintenantMs) {
   if (!points || !points.length) return [];
   if (periode === 'max') return points.slice();
-  const joursParPeriode = { '1mo': 31, '3mo': 92, '6mo': 183, '1y': 366, '5y': 1830 };
-  const jours = joursParPeriode[periode];
-  if (!jours) return points.slice();
-  const seuil = Math.floor(((maintenantMs || Date.now()) - jours * 86400000) / 1000);
+  const moisParPeriode = { '1mo': 1, '3mo': 3, '6mo': 6, '1y': 12, '5y': 60 };
+  const mois = moisParPeriode[periode];
+  if (!mois) return points.slice();
+  const d = new Date(maintenantMs || Date.now());
+  d.setUTCMonth(d.getUTCMonth() - mois);
+  const seuil = Math.floor(d.getTime() / 1000);
   return points.filter((p) => p.timestamp >= seuil);
 }
 
