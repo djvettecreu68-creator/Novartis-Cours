@@ -93,9 +93,10 @@ th{color:#6B7785;font-weight:600;font-size:.8rem}
   <div style="font-size:1.1rem;font-weight:700;margin-bottom:12px">Décision Algorithmique</div>
   <div id="signal-badge">—</div>
   <div id="signal-confiance"></div>
+  <div id="raison-signal" style="font-size:0.95rem; line-height:1.4; padding:12px; margin:12px 0; border-radius:12px; background:rgba(0,0,0,0.05); border-left:4px solid var(--prim); color:var(--txt);"></div>
   <div id="risque"></div>
   <div id="signal-explication" style="font-size:.88rem;color:#6B7785;margin-top:12px;margin-bottom:12px;text-align:center"></div>
-  <div id="signal-detail"></div>
+  <div id="signal-detail" style="margin-top:10px"></div>
 </div>
 
 <div class="carte">
@@ -457,8 +458,29 @@ function afficherSignal(s) {
   const pair = couleurs[s.couleur] || couleurs['attendre'];
   badge.textContent = s.signal;
   badge.style.background = pair[0]; badge.style.color = pair[1];
-  expl.textContent = s.explication + ' Score : ' + (s.score > 0 ? '+' : '') + s.score + '.';
+  expl.textContent = 'Score global : ' + (s.score > 0 ? '+' : '') + s.score + '.';
   conf.textContent = 'Confiance : ' + s.confiance;
+  
+  // Explication dynamique et pédagogique
+  const raisonEl = document.getElementById('raison-signal');
+  let raisonTexte = "";
+  if (s.signal === 'ACHAT FORT') {
+      raisonTexte = "🚀 <b>Pourquoi ?</b> La tendance de fond est haussière et le momentum est excellent. C'est le moment idéal pour entrer.";
+  } else if (s.signal === 'ACHAT MODÉRÉ') {
+      raisonTexte = "⚖️ <b>Pourquoi ?</b> La tendance globale est bonne, mais il y a une petite hésitation à court terme (souvent un indicateur négatif). C'est un bon point d'entrée, mais attends peut-être un mini-repli.";
+  } else if (s.signal === 'ATTENDRE' && s.confiance === 'Bloqué') {
+      raisonTexte = "🛑 <b>Pourquoi ?</b> L'action est dans une tendance baissière de fond. L'algorithme bloque l'achat pour te protéger (on n'attrape pas un couteau qui tombe).";
+  } else if (s.signal === 'ATTENDRE') {
+      raisonTexte = "✋ <b>Pourquoi ?</b> Les indicateurs se contredisent (ex: tendance bonne mais momentum mauvais) ou sont neutres. Il vaut mieux rester en dehors du marché.";
+  } else if (s.signal === 'VENTE FORTE') {
+      raisonTexte = "📉 <b>Pourquoi ?</b> La tendance s'est retournée à la baisse et les indicateurs confirment. C'est le moment de sécuriser tes gains ou de couper tes pertes.";
+  } else if (s.signal.includes('VENTE')) {
+      raisonTexte = "⚠️ <b>Pourquoi ?</b> Les signaux à court terme sont mauvais. L'action perd de sa force. La prudence est de mise.";
+  }
+  raisonEl.innerHTML = raisonTexte;
+
+  // Aide pour lire les détails
+  let aideDetail = '<div style="font-size:.75rem; color:#6B7785; margin-top:8px; margin-bottom:8px; font-style:italic; text-align:center">Les points (+) tirent le signal vers le haut (achat) et les points (-) vers le bas (vente).</div>';
   
   if (s.stopLoss && s.takeProfit) {
     risque.innerHTML = '<b>Gestion du Risque (Ratio ' + s.ratioRR + ')</b>'
@@ -467,7 +489,7 @@ function afficherSignal(s) {
     risque.style.display = 'block';
   } else { risque.style.display = 'none'; }
 
-  detail.innerHTML = s.details.map((d) => {
+  detail.innerHTML = aideDetail + s.details.map((d) => {
     const signe = d.pts > 0 ? '+' : '';
     const coul = d.pts > 0 ? 'var(--vert)' : (d.pts < 0 ? 'var(--rouge)' : '#6B7785');
     return '<div><span>' + d.nom + '</span><span style="color:#6B7785;font-size:.8rem;flex:1;text-align:right">' + d.valeur + '</span><span style="color:' + coul + ';font-weight:700;min-width:40px;text-align:right">' + signe + d.pts + '</span></div>';
