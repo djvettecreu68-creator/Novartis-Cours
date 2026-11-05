@@ -5,134 +5,114 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Novartis Cours</title>
 <style>
-:root{--fond:#F3F5F7;--txt:#162028;--prim:#0B5FA5;--carte:#FFFFFF;--bord:#D8DEE3;--rouge:#C0392B;--vert:#1E8449;color-scheme:light}
-@media(prefers-color-scheme:dark){:root{--fond:#12171C;--txt:#E9EEF1;--carte:#1B232B;--bord:#2A3540;color-scheme:dark}}
+:root{--fond:#F3F5F7;--txt:#162028;--doux:#5F6B76;--prim:#0B5FA5;--carte:#FFFFFF;--bord:#D8DEE3;--rouge:#C0392B;--vert:#1E8449;--courbe:#0B5FA5;--mm50:#E67E22;--mm200:#8E44AD;color-scheme:light}
+@media(prefers-color-scheme:dark){:root{--fond:#12171C;--txt:#E9EEF1;--doux:#9AA7B2;--carte:#1B232B;--bord:#2A3540;--rouge:#EF7468;--vert:#4CC27A;--courbe:#5DA9E9;--mm50:#F0A050;--mm200:#B98AD6;color-scheme:dark}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--fond);color:var(--txt);font:16px/1.45 system-ui,sans-serif;padding:16px 16px calc(80px + env(safe-area-inset-bottom,0px))}
-h1{font-size:1.45rem;margin:0 0 4px}
-.sous{color:#6B7785;font-size:.9rem;margin-bottom:16px}
-.carte{background:var(--carte);border:1px solid var(--bord);border-radius:18px;padding:16px;margin-bottom:14px}
-select,button,input[type="date"],input[type="number"]{font:inherit;border-radius:12px;border:1px solid var(--bord);padding:10px 12px;background:var(--carte);color:var(--txt)}
-button{background:var(--prim);color:#fff;border:0;font-weight:700;min-height:44px;padding:0 18px}
-button:active{opacity:.85}
+body{margin:0;background:var(--fond);color:var(--txt);font:16px/1.45 system-ui,sans-serif;padding:calc(14px + env(safe-area-inset-top,0px)) 14px calc(36px + env(safe-area-inset-bottom,0px))}
+h1{font-size:1.45rem;margin:0}
+.entete{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+#maj{color:var(--doux);font-size:.85rem}
+.grille{display:grid;gap:14px}
+@media(min-width:720px){.grille{grid-template-columns:1fr 1fr}.large{grid-column:1/-1}}
+.carte{background:var(--carte);border:1px solid var(--bord);border-radius:18px;padding:16px;min-width:0}
+.titre{font-size:1.05rem;font-weight:700;margin-bottom:8px}
+.gros{font-size:2rem;font-weight:800;line-height:1.15}
+.doux{color:var(--doux);font-size:.85rem}
+.hausse{color:var(--vert)}.baisse{color:var(--rouge)}
+button{font:inherit;border:0;border-radius:22px;min-height:44px;padding:0 18px;background:var(--prim);color:#fff;font-weight:700}
 button:disabled{opacity:.5}
-.ligne{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-label{font-size:.95rem}
-canvas{width:100%;height:280px;display:block}
-table{width:100%;border-collapse:collapse;font-size:.85rem}
-th,td{padding:7px 5px;border-bottom:1px solid var(--bord);text-align:right;white-space:nowrap}
+input,select{font:inherit;border-radius:12px;border:1px solid var(--bord);padding:9px 11px;background:var(--carte);color:var(--txt);min-width:0;width:100%}
+select{width:auto}
+.champs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.champs label{display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:var(--doux)}
+.champs .plein{grid-column:1/-1}
+.ligne{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--bord)}
+.ligne:last-child{border-bottom:0}
+.ligne b{white-space:nowrap;text-align:right}
+canvas{width:100%;height:260px;display:block;touch-action:pan-y}
+.legende{display:flex;gap:14px;flex-wrap:wrap;font-size:.78rem;color:var(--doux);margin-top:8px}
+.legende i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:5px;vertical-align:middle}
+table{width:100%;border-collapse:collapse;font-size:.86rem}
+th,td{padding:7px 3px;border-bottom:1px solid var(--bord);text-align:right;vertical-align:top}
 th:first-child,td:first-child{text-align:left}
-th{color:#6B7785;font-weight:600;font-size:.8rem}
-#message{font-size:.88rem;color:#6B7785;margin-top:8px;min-height:1.2em}
-#progression{font-size:.85rem;color:var(--prim);margin-top:6px}
-#controle{font-size:.78rem;color:#6B7785;padding:10px 2px;text-align:center}
-#signal-badge{font-size:1.6rem;font-weight:800;text-align:center;padding:22px;border-radius:16px;margin-bottom:8px;letter-spacing:.02em}
-#signal-confiance{text-align:center;font-size:.9rem;font-weight:700;margin-bottom:12px}
-#signal-detail>div{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid var(--bord);font-size:.85rem}
-#signal-detail>div:last-child{border-bottom:0}
-#actus>div{padding:9px 0;border-bottom:1px solid var(--bord);cursor:pointer}
-#actus>div:last-child{border-bottom:0}
-#actus .actu-titre{font-weight:600;font-size:.9rem;line-height:1.3}
-#actus .actu-meta{color:#6B7785;font-size:.75rem;margin-top:3px}
-#actus .actu-pos{color:var(--vert);font-weight:700}
-#actus .actu-neg{color:var(--rouge);font-weight:700}
-.risque-box{margin-top:10px;padding:12px;background:rgba(11,95,165,.08);border-radius:12px;font-size:.85rem;border-left:4px solid var(--prim)}
-.risque-box b{display:block;margin-bottom:4px}
-.legende{display:flex;gap:14px;flex-wrap:wrap;font-size:.78rem;color:#6B7785;margin-top:8px}
-.legende span{display:flex;align-items:center;gap:5px}
-.legende i{display:inline-block;width:14px;height:3px;border-radius:2px}
+th{color:var(--doux);font-weight:600;font-size:.76rem}
+td small{display:block;color:var(--doux);font-size:.74rem}
+.actu{padding:9px 0;border-bottom:1px solid var(--bord)}
+.actu:last-child{border-bottom:0}
+.actu b{display:block;font-size:.92rem;line-height:1.3;font-weight:600}
+.note{font-size:.78rem;color:var(--doux);margin-top:10px}
+#controle{font-size:.78rem;color:var(--doux);padding:12px 2px;text-align:center}
 </style>
 </head>
 <body>
-<h1>Novartis Cours</h1>
-<div class="sous">Analyse Multi-Timeframes (1D + 1H) & Gestion du Risque</div>
-
-<div class="carte">
-  <div class="ligne">
-    <label for="intervalle">Précision</label>
-    <select id="intervalle">
-      <option value="1d">Journalier (Tendance)</option>
-      <option value="1h">Horaire (Momentum)</option>
-    </select>
-    <label for="periode">Afficher</label>
-    <select id="periode">
-      <option value="1mo">1 mois</option>
-      <option value="3mo" selected>3 mois</option>
-      <option value="6mo">6 mois</option>
-      <option value="1y">1 an</option>
-      <option value="max">Tout</option>
-    </select>
-  </div>
-  <div class="ligne" style="margin-top:10px">
-    <input type="checkbox" id="auto" style="width:22px;height:22px" checked>
-    <label for="auto">Surveillance en arrière-plan (24/7)</label>
-  </div>
-  <div class="ligne" style="margin-top:10px">
-    <button id="charger" style="flex:2">Tout actualiser maintenant</button>
-    <button id="vider" style="flex:1;background:#D2463A">Vider le cache</button>
-  </div>
-  <div id="message"></div>
-  <div id="progression"></div>
+<div class="entete">
+  <div><h1>Novartis Cours</h1><div id="maj">…</div></div>
+  <button id="actualiser">Actualiser</button>
 </div>
 
-<div class="carte">
-  <div style="font-size:1.1rem;font-weight:700;margin-bottom:12px">Mon Épargne (FCPE Natixis)</div>
-  <div class="ligne" style="margin-bottom:10px">
-    <label for="vl_date" style="width:100%">Date de la VL :</label>
-    <input type="date" id="vl_date" style="flex:1">
-  </div>
-  <div class="ligne" style="margin-bottom:10px">
-    <label for="vl_ref" style="width:100%">Montant de la VL (€) :</label>
-    <input type="number" id="vl_ref" step="0.001" value="109.657" style="flex:1">
-    <button id="sauver_vl" style="padding:8px 12px;min-height:auto">OK</button>
-  </div>
-  <div id="resultat_vl" style="font-size:1.1rem;text-align:center;padding:12px;background:var(--fond);border-radius:12px">
-    Valeur actuelle estimée : <br><b style="font-size:1.4rem;color:var(--prim)">— €</b>
-  </div>
-  <div style="font-size:.72rem;color:#8B959E;margin-top:8px;text-align:center">Estimation basée sur la variation de l'action.</div>
-</div>
+<div class="grille">
+  <section class="carte">
+    <div class="titre">Mon FCPE Novartis</div>
+    <div class="doux">Valeur estimée d’une part aujourd’hui</div>
+    <div class="gros" id="vlEstimee">— €</div>
+    <div id="vlVariation" class="doux"></div>
+    <div id="vlTotal" style="margin-top:6px"></div>
+    <div class="champs">
+      <label>Date de ta dernière VL<input type="date" id="vlDate"></label>
+      <label>VL de ce jour-là (€)<input type="text" inputmode="decimal" id="vlRef" placeholder="ex. 109,657"></label>
+      <label class="plein">Nombre de parts (facultatif)<input type="text" inputmode="decimal" id="parts" placeholder="ex. 152,3846"></label>
+    </div>
+    <button id="enregistrerVL" style="margin-top:12px;width:100%">Enregistrer</button>
+    <div id="vlMessage" class="note"></div>
+    <div id="vlControle" class="note"></div>
+    <div class="note">Estimation = ta dernière VL × la variation de l’action Novartis à Zurich, convertie en euros (CHF → €), dividende compris. Elle n’est jamais exacte au centime (liquidités du fonds, frais, heure du calcul) : remets ta VL à jour dès que tu en as une nouvelle.</div>
+  </section>
 
-<div class="carte">
-  <div style="font-size:1.1rem;font-weight:700;margin-bottom:12px">Décision Algorithmique</div>
-  <div id="signal-badge">—</div>
-  <div id="signal-confiance"></div>
-  <div id="raison-signal" style="font-size:0.95rem; line-height:1.4; padding:12px; margin:12px 0; border-radius:12px; background:rgba(0,0,0,0.05); border-left:4px solid var(--prim); color:var(--txt);"></div>
-  <div id="risque"></div>
-  <div id="signal-explication" style="font-size:.88rem;color:#6B7785;margin-top:12px;margin-bottom:12px;text-align:center"></div>
-  <div id="signal-detail" style="margin-top:10px"></div>
-</div>
+  <section class="carte">
+    <div class="titre">L’action Novartis</div>
+    <div class="ligne"><span>Zurich (NOVN)</span><b id="prixNovn">—</b></div>
+    <div class="ligne"><span>New York (NVS)</span><b id="prixNvs">—</b></div>
+    <div class="ligne"><span>NVS en euros</span><b id="prixNvsEur">—</b></div>
+    <div class="ligne"><span>Change</span><b id="change">—</b></div>
+    <div class="note" id="seances">Cours différés d’environ 15 à 20 minutes.</div>
+  </section>
 
-<div class="carte">
-  <div style="font-size:1.1rem;font-weight:700;margin-bottom:8px">Backtesting (données journalières)</div>
-  <div id="backtest" style="font-size:.9rem;color:#6B7785">Calcul en cours…</div>
-</div>
+  <section class="carte">
+    <div class="titre">Bourse NVS : les repères</div>
+    <div id="reperes" class="doux">—</div>
+    <div class="note">Ce sont des repères, pas un conseil d’achat ou de vente : aucun indicateur ne prédit la suite. Regarde surtout le test sur 5 ans.</div>
+  </section>
 
-<div class="carte">
-  <canvas id="graphique"></canvas>
-  <div class="legende">
-    <span><i style="background:#0B5FA5"></i> Cours</span>
-    <span><i style="background:#E67E22"></i> MM50</span>
-    <span><i style="background:#8E44AD"></i> MM200</span>
-  </div>
-</div>
+  <section class="carte">
+    <div class="titre">Test honnête sur 5 ans</div>
+    <div id="backtest" class="doux">—</div>
+    <div class="note">Cours ajustés (dividendes compris), ordre passé à la clôture du lendemain du signal, 0,2&nbsp;% de frais par ordre, hors impôts. Le passé ne garantit rien pour la suite.</div>
+  </section>
 
-<div class="carte">
-  <div style="font-size:1.1rem;font-weight:700;margin-bottom:8px">Actualité récente</div>
-  <div id="actus"></div>
-</div>
+  <section class="carte large">
+    <div class="ligne" style="border:0;padding-top:0">
+      <span class="titre" style="margin:0">Graphique NVS ($)</span>
+      <select id="periode" aria-label="Période du graphique">
+        <option value="21">1 mois</option>
+        <option value="63">3 mois</option>
+        <option value="126">6 mois</option>
+        <option value="252" selected>1 an</option>
+        <option value="1260">5 ans</option>
+        <option value="2520">10 ans</option>
+      </select>
+    </div>
+    <canvas id="graphique"></canvas>
+    <div class="legende"><span><i style="background:var(--courbe)"></i>Cours</span><span><i style="background:var(--mm50)"></i>Moyenne 50 jours</span><span><i style="background:var(--mm200)"></i>Moyenne 200 jours</span></div>
+    <div id="pointe" class="doux" style="min-height:1.3em;margin-top:4px"></div>
+  </section>
 
-<div class="carte" style="overflow-x:auto">
-  <div style="font-size:.8rem;color:#6B7785;margin-bottom:6px">80 derniers points affichés</div>
-  <table>
-    <thead>
-      <tr><th>Date</th><th>Ouv.</th><th>Haut</th><th>Bas</th><th>Clôt.</th><th>Ajusté</th><th>Vol.</th></tr>
-    </thead>
-    <tbody id="tableau"></tbody>
-  </table>
+  <section class="carte large">
+    <div class="titre">Actualités</div>
+    <div id="actus" class="doux">—</div>
+  </section>
 </div>
 
 <div id="controle"></div>
-
 <script>
 // Mouchard v3 — signale à Playstoore les erreurs de l'écran, les appels au serveur en échec,
 // et les problèmes que tu signales toi-même (secoue le téléphone, ou appui long sur le titre).
@@ -143,6 +123,7 @@ th{color:#6B7785;font-weight:600;font-size:.8rem}
   const heure = () => new Date().toLocaleTimeString('fr-FR');
   const couper = (t, n) => { t = String(t == null ? '' : t); return t.length > n ? t.slice(0, n) + '…' : t; };
   const noter = (t) => { gestes.push(heure() + ' ' + couper(t, 160)); if (gestes.length > 12) gestes.shift(); };
+  // photo de l'appli : ce qui est affiché, les champs, les données enregistrées, le téléphone
   const etat = () => {
     const champs = [...document.querySelectorAll('input, select, textarea')]
       .filter((c) => !c.closest('#__signal') && c.type !== 'password')
@@ -155,7 +136,7 @@ th{color:#6B7785;font-weight:600;font-size:.8rem}
   const envoyer = (type, message, ligne, colonne, pile, plus) => {
     if (!ligne && pile) { const m = String(pile).match(/:(\d+):(\d+)\)?\s*$/m); if (m) { ligne = +m[1]; colonne = +m[2]; } }
     const cle = type + '|' + message + '|' + ligne, maintenant = Date.now();
-    if (dejaVu[cle] && maintenant - dejaVu[cle] < 3000) return false;
+    if (dejaVu[cle] && maintenant - dejaVu[cle] < 3000) return false; // pas de rafale
     dejaVu[cle] = maintenant;
     if (!(window.Android && Android.signalerErreur)) return false;
     Android.signalerErreur(JSON.stringify(Object.assign({ type, message: couper(message, 500), ligne: ligne || 0, colonne: colonne || 0,
@@ -168,6 +149,7 @@ th{color:#6B7785;font-weight:600;font-size:.8rem}
     b.style.cssText = 'position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:14px;z-index:2147483647;font:15px system-ui,sans-serif';
     document.body.appendChild(b); setTimeout(() => b.remove(), 2600);
   };
+  // ce que la personne fait
   document.addEventListener('click', (e) => {
     const b = e.target.closest && e.target.closest('button, a, input, select, label, [onclick], [role="button"]');
     if (!b || b.closest('#__signal')) return;
@@ -178,6 +160,7 @@ th{color:#6B7785;font-weight:600;font-size:.8rem}
     const c = e.target; if (!c || !c.tagName || c.closest('#__signal')) return;
     noter('change ' + c.tagName.toLowerCase() + (c.id ? ' #' + c.id : '') + (c.type === 'password' ? '' : ' = « ' + String(c.type === 'checkbox' ? c.checked : c.value).slice(0, 30) + ' »'));
   }, true);
+  // appels au serveur : tous ceux qui échouent sont signalés, avec la réponse du serveur
   if (window.fetch) {
     const fetchAvant = window.fetch;
     window.fetch = async (...a) => {
@@ -195,14 +178,16 @@ th{color:#6B7785;font-weight:600;font-size:.8rem}
       }
     };
   }
+  // les erreurs
   window.addEventListener('error', (e) => envoyer('ecran', e.message || 'Erreur', e.lineno, e.colno, e.error && e.error.stack));
   window.addEventListener('unhandledrejection', (e) => { const r = e.reason; envoyer('ecran', 'Promesse rejetée : ' + ((r && r.message) || r), 0, 0, r && r.stack); });
   const consoleErreur = console.error;
   console.error = (...a) => { consoleErreur.apply(console, a); envoyer('console', 'console.error : ' + a.map(String).join(' '), 0, 0, new Error().stack); };
+  // signaler un problème soi-même
   function ouvrirSignalement() {
     if (document.getElementById('__signal')) return;
     noter('ouvre « Signaler un problème »');
-    const photo = etat();
+    const photo = etat(); // prise AVANT d'ouvrir la fenêtre
     const d = document.createElement('div');
     d.id = '__signal';
     d.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;font:16px/1.4 system-ui,sans-serif';
@@ -226,6 +211,7 @@ th{color:#6B7785;font-weight:600;font-size:.8rem}
     };
   }
   window.ouvrirSignalement = ouvrirSignalement;
+  // appui long sur le titre (en plus de la secousse du téléphone)
   let minuteur = null;
   document.addEventListener('touchstart', (e) => { if (e.target.closest && e.target.closest('h1')) minuteur = setTimeout(ouvrirSignalement, 800); }, { passive: true });
   ['touchend', 'touchmove', 'touchcancel'].forEach((t) => document.addEventListener(t, () => clearTimeout(minuteur), { passive: true }));
@@ -233,697 +219,463 @@ th{color:#6B7785;font-weight:600;font-size:.8rem}
   noter('ouverture de l’appli');
 })();
 
-const requetesEnCours = {};
-window.__reponse = (data) => {
-  const p = requetesEnCours[data.id]; if (!p) return;
-  delete requetesEnCours[data.id];
-  if (data.statut >= 200 && data.statut < 400) p.resolve(data.corps);
-  else p.reject(new Error('HTTP ' + data.statut));
-};
+// ===== Novartis Cours — tout passe par le téléphone (pont Android), plus de GitHub ni de Cloudflare =====
+const A = window.Android; // absent quand la page est ouverte dans un navigateur
+const DANS_APPLI = !!(A && A.lireTexte);
+const SEANCES_AN = 252;
+const FRAIS = 0.002; // 0,2 % de frais par ordre dans le test sur 5 ans
+const CLE = { donnees: 'novartis.v4.donnees', vlRef: 'novartis.vlRef', vlDate: 'novartis.vlDate', parts: 'novartis.parts', controle: 'novartis.controleVL' };
+const etat = { donnees: null, enCours: false, pointe: null, graphe: null, erreurs: [] };
+const id = (x) => document.getElementById(x);
+
+// Ménage : les gros caches de l’ancienne version ne servent plus
+['novartis.v3.1d', 'novartis.v3.1h', 'novartis.backtest', 'novartis.actus', 'novartis.auto', 'novartis.dernierSignal']
+  .forEach((k) => { try { localStorage.removeItem(k); } catch (e) { } });
+
+// ---------- Petits outils ----------
+function formaterNombre(v, dec) {
+  if (v == null || !isFinite(v)) return '—';
+  const d = dec == null ? 2 : dec;
+  return Number(v).toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+function pct(v, dec) { return v == null || !isFinite(v) ? '—' : (v > 0 ? '+' : '') + formaterNombre(v, dec == null ? 1 : dec) + '\u00a0%'; }
+function classe(v) { return v > 0 ? 'hausse' : (v < 0 ? 'baisse' : ''); }
+function lireNombre(t) {
+  if (t == null) return null;
+  const s = String(t).replace(/[\s\u00a0\u202f]/g, '').replace(',', '.');
+  return /^-?\d+(\.\d+)?$/.test(s) ? parseFloat(s) : null;
+}
+function lireJSON(cle) { try { return JSON.parse(localStorage.getItem(cle) || 'null'); } catch (e) { return null; } }
+function echapper(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function dateFR(iso) { const p = String(iso || '').split('-'); return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : '—'; }
+// jour de la séance, heure locale de la Bourse (+6 h : marche que Yahoo date la séance à l’ouverture ou à minuit)
+function jourDe(ts, decalage) { return new Date((ts + (decalage || 0) + 6 * 3600) * 1000).toISOString().slice(0, 10); }
+function aujourdhui() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function quand(ms) {
+  if (!ms) return '';
+  const m = Math.round((Date.now() - ms) / 60000);
+  if (m < 1) return 'à l’instant';
+  if (m < 60) return 'il y a ' + m + ' min';
+  if (m < 24 * 60) return 'il y a ' + Math.round(m / 60) + ' h';
+  return 'le ' + new Date(ms).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+}
+function nombres(tab) { return (tab || []).map((v) => (typeof v === 'number' ? v : (v && v.close))); }
+function dernier(tab) { return tab && tab.length ? tab[tab.length - 1] : null; }
+// un bloc d’affichage qui plante n’empêche pas les autres de s’afficher, et l’erreur part quand même au mouchard
+function sur(f) { try { f(); } catch (e) { console.error('Affichage : ' + ((e && e.stack) || e)); } }
+
+// ---------- Téléchargement par le téléphone (pas de blocage CORS) ----------
+const requetes = {};
+window.__reponse = (r) => { const fin = requetes[r.id]; if (!fin) return; delete requetes[r.id]; fin({ statut: r.statut, corps: r.corps || '' }); };
 function lire(url) {
-  return new Promise((resolve, reject) => {
-    if (window.Android && Android.lireTexte) {
-      const id = 'r' + Math.random().toString(36).slice(2);
-      requetesEnCours[id] = { resolve, reject };
-      try { Android.lireTexte(url, id); }
-      catch (e) { delete requetesEnCours[id]; reject(e); return; }
-      setTimeout(() => { if (requetesEnCours[id]) { delete requetesEnCours[id]; reject(new Error('Timeout')); } }, 30000);
-    } else reject(new Error('Pas de moyen de télécharger'));
+  return new Promise((fin) => {
+    if (!DANS_APPLI) { fin({ statut: 0, corps: 'téléchargement possible seulement dans l’appli' }); return; }
+    const n = 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    requetes[n] = fin;
+    try { A.lireTexte(url, n); } catch (e) { delete requetes[n]; fin({ statut: 0, corps: String((e && e.message) || e) }); return; }
+    setTimeout(() => { if (requetes[n]) { delete requetes[n]; fin({ statut: 0, corps: 'pas de réponse en 30 s' }); } }, 30000);
   });
 }
 
-const JEUX = [
-  { cle: '1d', interval: '1d', range: 'max', libelle: 'Journalier' },
-  { cle: '1h', interval: '1h', range: '2y', libelle: 'Horaire' }
-];
-const URL_BASE_GITHUB = 'https://raw.githubusercontent.com/djvettecreu68-creator/Novartis-Cours/main/';
-const URL_NEWS_FR = 'https://news.google.com/rss/search?q=Novartis+when:7d&hl=fr&gl=FR&ceid=FR:fr';
-const URL_NEWS_EN = 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=NVS&region=US&lang=en-US';
-
-const PREFIXE_CACHE = 'novartis.v3.';
-const CLE_AUTO = 'novartis.auto';
-const CLE_ACTUS = 'novartis.actus';
-const CLE_BACKTEST = 'novartis.backtest';
-const etat = { intervalle: '1d', jeux: {}, actus: [], backtestCache: null };
-
-function cleCache(cle) { return PREFIXE_CACHE + cle; }
-function lireCache(cle) {
-  try {
-    const brut = localStorage.getItem(cleCache(cle));
-    if (!brut) return null;
-    const data = JSON.parse(brut);
-    if (!data || !Array.isArray(data.points) || !data.points.length) return null;
-    return data;
-  } catch (e) { return null; }
-}
-function ecrireCache(cle, data) {
-  try { localStorage.setItem(cleCache(cle), JSON.stringify({ devise: data.devise || 'USD', dateMax: Date.now(), points: data.points })); return true; }
-  catch (e) { return false; }
-}
-function filtrerPoints(points, periode, maintenantMs) {
-  if (!points || !points.length) return [];
-  if (periode === 'max') return points.slice();
-  const moisParPeriode = { '1mo': 1, '3mo': 3, '6mo': 6, '1y': 12, '5y': 60 };
-  const mois = moisParPeriode[periode];
-  if (!mois) return points.slice();
-  const d = new Date(maintenantMs || Date.now());
-  d.setUTCMonth(d.getUTCMonth() - mois);
-  return points.filter((p) => p.timestamp >= Math.floor(d.getTime() / 1000));
-}
-function formaterNombre(v) {
-  if (v == null || isNaN(v)) return '—';
-  return Number(v).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-function formaterDate(ts, intervalle) {
-  const d = new Date(ts * 1000);
-  if (intervalle === '1d') return d.toLocaleDateString('fr-FR');
-  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' }) + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-}
-
-function valeurPoint(p) { return p.adjclose != null ? p.adjclose : p.close; }
-
-function sma(points, n) {
-  if (!points || points.length < n) return null;
-  let somme = 0;
-  for (let i = points.length - n; i < points.length; i++) somme += valeurPoint(points[i]);
-  return somme / n;
-}
-function smaSerie(points, n) {
-  const out = new Array(points.length).fill(null);
-  if (!points || points.length < n) return out;
-  let somme = 0;
-  for (let i = 0; i < points.length; i++) {
-    somme += valeurPoint(points[i]);
-    if (i >= n) somme -= valeurPoint(points[i - n]);
-    if (i >= n - 1) out[i] = somme / n;
+function arrondir(v) { return Math.round(v * 10000) / 10000; }
+// Réponse Yahoo → { t: horodatages, j: jours 'AAAA-MM-JJ', c: clôtures, a: clôtures ajustées (dividendes) }
+function normaliserYahoo(texte, symbole) {
+  let data;
+  try { data = JSON.parse(texte); } catch (e) { const err = new Error(symbole + ' : réponse illisible'); err.detail = String(texte).slice(0, 300); throw err; }
+  const r = data && data.chart && data.chart.result && data.chart.result[0];
+  if (!r) { const e = data && data.chart && data.chart.error; throw new Error(symbole + ' : ' + ((e && (e.description || e.code)) || 'aucune donnée')); }
+  const ts = r.timestamp || [];
+  const q = (r.indicators && r.indicators.quote && r.indicators.quote[0]) || {};
+  const adj = (r.indicators && r.indicators.adjclose && r.indicators.adjclose[0] && r.indicators.adjclose[0].adjclose) || [];
+  const meta = r.meta || {};
+  const s = { symbole, devise: meta.currency || '', decalage: meta.gmtoffset || 0, t: [], j: [], c: [], a: [] };
+  for (let i = 0; i < ts.length; i++) {
+    const c = q.close ? q.close[i] : null;
+    if (c == null || !isFinite(c) || c <= 0) continue;
+    const a = adj[i] != null && isFinite(adj[i]) && adj[i] > 0 ? adj[i] : c;
+    const jour = jourDe(ts[i], s.decalage);
+    if (dernier(s.j) === jour) { s.t.pop(); s.j.pop(); s.c.pop(); s.a.pop(); } // même séance en double : on garde la plus récente
+    s.t.push(ts[i]); s.j.push(jour); s.c.push(arrondir(c)); s.a.push(arrondir(a));
   }
-  return out;
-}
-function ema(points, n) {
-  const k = 2 / (n + 1); const out = []; let prev = null;
-  for (let i = 0; i < points.length; i++) {
-    const v = valeurPoint(points[i]);
-    if (i === 0) { prev = v; out.push(v); }
-    else { prev = v * k + prev * (1 - k); out.push(prev); }
-  }
-  return out;
-}
-function rsi(points, n) {
-  n = n || 14;
-  if (!points || points.length < n + 1) return null;
-  let gains = 0, pertes = 0;
-  for (let i = 1; i <= n; i++) {
-    const d = valeurPoint(points[i]) - valeurPoint(points[i - 1]);
-    if (d > 0) gains += d; else pertes += -d;
-  }
-  let moyGain = gains / n, moyPerte = pertes / n;
-  for (let i = n + 1; i < points.length; i++) {
-    const d = valeurPoint(points[i]) - valeurPoint(points[i - 1]);
-    const g = d > 0 ? d : 0, p = d < 0 ? -d : 0;
-    moyGain = (moyGain * (n - 1) + g) / n;
-    moyPerte = (moyPerte * (n - 1) + p) / n;
-  }
-  if (moyPerte === 0) return moyGain === 0 ? 50 : 100;
-  return 100 - 100 / (1 + (moyGain / moyPerte));
-}
-function macd(points) {
-  if (!points || points.length < 35) return null;
-  const e12 = ema(points, 12), e26 = ema(points, 26);
-  const ligne = e12.map((v, i) => v - e26[i]);
-  const faussPts = ligne.slice(25).map((v) => ({ close: v, adjclose: null }));
-  const sig = ema(faussPts, 9);
-  return { ligne: ligne[ligne.length - 1], signal: sig[sig.length - 1], histogramme: ligne[ligne.length - 1] - sig[sig.length - 1] };
-}
-function atr(points, n) {
-  n = n || 14;
-  if (!points || points.length < n + 1) return null;
-  let trs = [];
-  for (let i = 1; i < points.length; i++) {
-    const high = points[i].high, low = points[i].low, prevClose = points[i - 1].close;
-    trs.push(Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose)));
-  }
-  let atrVal = trs.slice(0, n).reduce((a, b) => a + b, 0) / n;
-  for (let i = n; i < trs.length; i++) atrVal = (atrVal * (n - 1) + trs[i]) / n;
-  return atrVal;
-}
-function adx(points, n) {
-  n = n || 14;
-  if (!points || points.length < n * 2) return null;
-  let trs = [], plusDM = [], minusDM = [];
-  for (let i = 1; i < points.length; i++) {
-    const high = points[i].high, low = points[i].low, prevHigh = points[i - 1].high, prevLow = points[i - 1].low, prevClose = points[i - 1].close;
-    trs.push(Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose)));
-    const upMove = high - prevHigh, downMove = prevLow - low;
-    plusDM.push(upMove > downMove && upMove > 0 ? upMove : 0);
-    minusDM.push(downMove > upMove && downMove > 0 ? downMove : 0);
-  }
-  let smoothTR = trs.slice(0, n).reduce((a, b) => a + b, 0);
-  let smoothPlus = plusDM.slice(0, n).reduce((a, b) => a + b, 0);
-  let smoothMinus = minusDM.slice(0, n).reduce((a, b) => a + b, 0);
-  let dxs = [];
-  for (let i = n; i < trs.length; i++) {
-    smoothTR = smoothTR - (smoothTR / n) + trs[i];
-    smoothPlus = smoothPlus - (smoothPlus / n) + plusDM[i];
-    smoothMinus = smoothMinus - (smoothMinus / n) + minusDM[i];
-    const diPlus = 100 * (smoothPlus / smoothTR), diMinus = 100 * (smoothMinus / smoothTR);
-    const sum = diPlus + diMinus;
-    dxs.push(sum === 0 ? 0 : 100 * Math.abs(diPlus - diMinus) / sum);
-  }
-  if (dxs.length < n) return null;
-  let adxVal = dxs.slice(0, n).reduce((a, b) => a + b, 0) / n;
-  for (let i = n; i < dxs.length; i++) adxVal = (adxVal * (n - 1) + dxs[i]) / n;
-  return adxVal;
-}
-
-function analyserTitre(titre) {
-  const t = String(titre || '').toLowerCase();
-  const pos = ['beat', 'raise', 'approval', 'success', 'growth', 'upgrade', 'profit', 'breakthrough', 'record', 'approuv', 'hausse', 'bénéfice', 'succès', 'positif', 'positive'];
-  const neg = ['miss', 'downgrade', 'lawsuit', 'fail', 'recall', 'warning', 'loss', 'drop', 'plunge', 'fall', 'decline', 'reject', 'investigation', 'procès', 'échec', 'chute', 'baisse', 'perte', 'negative'];
-  let s = 0;
-  for (const m of pos) if (t.includes(m)) s++;
-  for (const m of neg) if (t.includes(m)) s--;
+  if (!s.t.length) throw new Error(symbole + ' : aucun cours reçu');
   return s;
 }
-
-function calculerSignal(journalier, horaire, actus) {
-  if (!journalier || journalier.length < 200) {
-    return { ok: false, raison: 'Pas assez de données journalières (min. 200 points).' };
+async function chargerSerie(symbole, periode) {
+  const chemin = '/v8/finance/chart/' + symbole + '?range=' + periode + '&interval=1d&includePrePost=false&events=div%2Csplits';
+  let r = await lire('https://query1.finance.yahoo.com' + chemin);
+  if (r.statut !== 200) { const r2 = await lire('https://query2.finance.yahoo.com' + chemin); if (r2.statut === 200 || !r.statut) r = r2; }
+  if (r.statut !== 200) {
+    const e = new Error(symbole + ' : ' + (r.statut ? 'Yahoo a répondu ' + r.statut : 'pas de réponse (' + r.corps + ')'));
+    e.reseau = !r.statut;
+    e.detail = String(r.corps).slice(0, 300);
+    throw e;
   }
-  const closeJ = valeurPoint(journalier[journalier.length - 1]);
-  const mm200 = sma(journalier, 200);
-  const adxJ = adx(journalier, 14);
-  const at = atr(journalier, 14);
-
-  // Momentum horaire (si disponible et assez long)
-  let closeH = closeJ, rsiH = null, macdH = null, mm50H = null;
-  if (horaire && horaire.length >= 60) {
-    closeH = valeurPoint(horaire[horaire.length - 1]);
-    rsiH = rsi(horaire, 14);
-    macdH = macd(horaire);
-    mm50H = sma(horaire, 50);
-  } else {
-    // repli sur journalier
-    rsiH = rsi(journalier, 14);
-    macdH = macd(journalier);
-    mm50H = sma(journalier, 50);
-  }
-
-  let score = 0;
-  const details = [];
-
-  // Tendance de fond (1D)
-  let tendance = 'neutre';
-  if (adxJ != null && mm200 != null) {
-    if (closeJ > mm200 && adxJ > 20) tendance = 'haussiere';
-    else if (closeJ < mm200 && adxJ > 20) tendance = 'baissiere';
-  }
-  let ptsTendance = tendance === 'haussiere' ? 30 : (tendance === 'baissiere' ? -30 : 0);
-  score += ptsTendance;
-  details.push({ nom: 'Tendance (1D)', valeur: tendance + ' (ADX ' + (adxJ != null ? adxJ.toFixed(1) : '—') + ')', pts: ptsTendance });
-
-  // Momentum
-  let ptsMomentum = (mm50H != null && closeH > mm50H) ? 15 : -15;
-  score += ptsMomentum;
-  details.push({ nom: 'Momentum', valeur: mm50H != null ? ('Prix ' + (closeH > mm50H ? '>' : '<') + ' MM50') : '—', pts: ptsMomentum });
-
-  // RSI
-  let ptsRSI = 0;
-  if (rsiH != null) {
-    ptsRSI = rsiH <= 30 ? 25 : (rsiH >= 70 ? -25 : Math.round((50 - rsiH) / 2));
-  }
-  score += ptsRSI;
-  details.push({ nom: 'RSI', valeur: rsiH != null ? rsiH.toFixed(1) : '—', pts: ptsRSI });
-
-  // MACD
-  let ptsMACD = (macdH && macdH.histogramme > 0) ? 15 : -15;
-  score += ptsMACD;
-  details.push({ nom: 'MACD', valeur: macdH ? macdH.histogramme.toFixed(3) : '—', pts: ptsMACD });
-
-  // News
-  let scoreNews = 0;
-  for (const actu of (actus || [])) scoreNews += analyserTitre(actu.titre);
-  let bonusNews = Math.max(-20, Math.min(20, scoreNews * 4));
-  details.push({ nom: 'Actualités', valeur: (actus || []).length + ' titres', pts: bonusNews });
-
-  let scoreFinal = Math.max(-105, Math.min(105, score + bonusNews));
-  let signal, couleur, explication, confiance;
-
-  if (tendance === 'baissiere' && scoreFinal > 0) {
-    signal = 'ATTENDRE'; couleur = 'attendre'; confiance = 'Bloqué';
-    explication = 'Achats bloqués : tendance de fond baissière.';
-  } else if (tendance === 'haussiere' && scoreFinal >= 40) {
-    signal = 'ACHAT FORT'; couleur = 'fort-achat'; confiance = 'Haute';
-    explication = 'Tendance de fond et momentum alignés à la hausse.';
-  } else if (scoreFinal >= 15) {
-    signal = 'ACHAT MODÉRÉ'; couleur = 'achat'; confiance = 'Moyenne';
-    explication = 'Signaux haussiers, prudence recommandée.';
-  } else if (scoreFinal <= -40) {
-    signal = 'VENTE FORTE'; couleur = 'fort-vente'; confiance = 'Haute';
-    explication = 'Tendance baissière confirmée.';
-  } else if (scoreFinal <= -15) {
-    signal = 'VENTE MODÉRÉE'; couleur = 'vente'; confiance = 'Moyenne';
-    explication = 'Signaux baissiers.';
-  } else {
-    signal = 'ATTENDRE'; couleur = 'attendre'; confiance = 'Neutre';
-    explication = 'Pas de direction claire, marché indécis.';
-  }
-
-  let stopLoss = null, takeProfit = null, ratioRR = null;
-  if (at && signal.includes('ACHAT')) {
-    stopLoss = closeJ - (at * 1.5);
-    takeProfit = closeJ + (at * 3);
-    ratioRR = '1 : 2';
-  }
-
-  return { ok: true, score: scoreFinal, signal, couleur, explication, confiance, details, close: closeJ, stopLoss, takeProfit, ratioRR };
+  return normaliserYahoo(r.corps, symbole);
 }
 
-function lancerBacktest(journalier) {
-  if (!journalier || journalier.length < 300) return null;
-
-  // Cache simple basé sur le dernier timestamp + longueur
-  const cleCacheBt = journalier.length + '_' + journalier[journalier.length - 1].timestamp;
-  try {
-    const brut = localStorage.getItem(CLE_BACKTEST);
-    if (brut) {
-      const c = JSON.parse(brut);
-      if (c && c.cle === cleCacheBt) return c.resultat;
-    }
-  } catch (e) {}
-
-  let trades = 0, gagnants = 0, gainTotal = 0, pertes = 0;
-  const horizon = 20; // jours de détention max
-
-  for (let i = 220; i < journalier.length - horizon; i += 4) {
-    const slice = journalier.slice(0, i + 1);
-    const s = calculerSignal(slice, null, []); // backtest purement journalier pour stabilité
-    if (!s.ok || !s.signal.includes('ACHAT')) continue;
-
-    trades++;
-    const entree = s.close;
-    let sortie = valeurPoint(journalier[i + horizon]);
-    let hit = false;
-
-    // Sortie anticipée si SL ou TP touché
-    if (s.stopLoss != null && s.takeProfit != null) {
-      for (let j = 1; j <= horizon; j++) {
-        const p = journalier[i + j];
-        if (!p) break;
-        if (p.low <= s.stopLoss) { sortie = s.stopLoss; hit = true; break; }
-        if (p.high >= s.takeProfit) { sortie = s.takeProfit; hit = true; break; }
-      }
-    }
-
-    const perf = (sortie - entree) / entree;
-    if (perf > 0) { gagnants++; gainTotal += perf; }
-    else { pertes += perf; }
-  }
-
-  const resultat = trades === 0
-    ? { trades: 0, msg: 'Aucun signal d’achat sur la période.' }
-    : {
-        trades,
-        winRate: ((gagnants / trades) * 100).toFixed(1),
-        gainMoyen: ((gainTotal + pertes) / trades * 100).toFixed(2),
-        gagnants
-      };
-
-  try { localStorage.setItem(CLE_BACKTEST, JSON.stringify({ cle: cleCacheBt, resultat })); } catch (e) {}
-  return resultat;
-}
-
-function afficherSignal(s) {
-  const badge = document.getElementById('signal-badge');
-  const expl = document.getElementById('signal-explication');
-  const detail = document.getElementById('signal-detail');
-  const conf = document.getElementById('signal-confiance');
-  const risque = document.getElementById('risque');
-  const raisonEl = document.getElementById('raison-signal');
-
-  if (!s || !s.ok) {
-    badge.textContent = '—'; badge.style.background = '#B5BCC3'; badge.style.color = '#2B3338';
-    expl.textContent = s && s.raison ? s.raison : 'Aucune donnée.';
-    detail.innerHTML = ''; conf.textContent = ''; risque.innerHTML = ''; raisonEl.innerHTML = '';
-    return;
-  }
-
-  const couleurs = {
-    'fort-achat': ['#1E8449', '#FFFFFF'],
-    'achat': ['#7DBB92', '#0F2B18'],
-    'attendre': ['#B5BCC3', '#2B3338'],
-    'vente': ['#E8A29A', '#4A0E0A'],
-    'fort-vente': ['#C0392B', '#FFFFFF']
-  };
-  const pair = couleurs[s.couleur] || couleurs['attendre'];
-  badge.textContent = s.signal;
-  badge.style.background = pair[0]; badge.style.color = pair[1];
-  expl.textContent = 'Score global : ' + (s.score > 0 ? '+' : '') + s.score + '.';
-  conf.textContent = 'Confiance : ' + s.confiance;
-
-  let raisonTexte = '';
-  if (s.signal === 'ACHAT FORT') {
-    raisonTexte = '🚀 <b>Pourquoi ?</b> Tendance de fond haussière + momentum aligné. Bon point d’entrée statistique.';
-  } else if (s.signal === 'ACHAT MODÉRÉ') {
-    raisonTexte = '⚖️ <b>Pourquoi ?</b> Tendance globalement positive mais signaux mixtes à court terme. Entrée possible avec stop serré.';
-  } else if (s.signal === 'ATTENDRE' && s.confiance === 'Bloqué') {
-    raisonTexte = '🛑 <b>Pourquoi ?</b> Tendance de fond baissière. L’algo refuse d’acheter pour éviter d’attraper un couteau qui tombe.';
-  } else if (s.signal === 'ATTENDRE') {
-    raisonTexte = '✋ <b>Pourquoi ?</b> Indicateurs contradictoires ou neutres. Mieux vaut rester à l’écart.';
-  } else if (s.signal === 'VENTE FORTE') {
-    raisonTexte = '📉 <b>Pourquoi ?</b> Tendance baissière confirmée. Sécuriser les gains ou couper les pertes.';
-  } else if (s.signal.includes('VENTE')) {
-    raisonTexte = '⚠️ <b>Pourquoi ?</b> Momentum et signaux courts se dégradent. Prudence.';
-  }
-  raisonEl.innerHTML = raisonTexte;
-
-  if (s.stopLoss && s.takeProfit) {
-    risque.innerHTML = '<div class="risque-box"><b>Gestion du Risque (Ratio ' + s.ratioRR + ')</b>'
-      + '🛑 Stop-Loss : <b>' + formaterNombre(s.stopLoss) + ' $</b><br>'
-      + '🎯 Take-Profit : <b>' + formaterNombre(s.takeProfit) + ' $</b></div>';
-    risque.style.display = 'block';
-  } else {
-    risque.style.display = 'none';
-  }
-
-  const aide = '<div style="font-size:.75rem;color:#6B7785;margin:8px 0;font-style:italic;text-align:center">Les points (+) poussent vers l’achat, les points (-) vers la vente.</div>';
-  detail.innerHTML = aide + s.details.map((d) => {
-    const signe = d.pts > 0 ? '+' : '';
-    const coul = d.pts > 0 ? 'var(--vert)' : (d.pts < 0 ? 'var(--rouge)' : '#6B7785');
-    return '<div><span>' + d.nom + '</span><span style="color:#6B7785;font-size:.8rem;flex:1;text-align:right">' + d.valeur + '</span><span style="color:' + coul + ';font-weight:700;min-width:40px;text-align:right">' + signe + d.pts + '</span></div>';
-  }).join('');
-}
-
-function mettreAJourVL(jeuJournalier) {
-  const vlRefInput = document.getElementById('vl_ref');
-  const vlDateInput = document.getElementById('vl_date');
-
-  let vlRef = parseFloat(localStorage.getItem('novartis.vlRef')) || 109.657;
-  let vlDate = localStorage.getItem('novartis.vlDate');
-  if (!vlDate) {
-    vlDate = new Date().toISOString().split('T')[0];
-    localStorage.setItem('novartis.vlDate', vlDate);
-  }
-
-  vlRefInput.value = vlRef;
-  vlDateInput.value = vlDate;
-
-  document.getElementById('sauver_vl').onclick = () => {
-    const v = parseFloat(vlRefInput.value);
-    const d = vlDateInput.value;
-    if (v > 0 && d) {
-      localStorage.setItem('novartis.vlRef', v);
-      localStorage.setItem('novartis.vlDate', d);
-      afficher();
-    }
-  };
-
-  if (!jeuJournalier || !jeuJournalier.points || !jeuJournalier.points.length) return;
-
-  const points = jeuJournalier.points;
-  const dernierPoint = points[points.length - 1];
-  const coursActuel = valeurPoint(dernierPoint);
-
-  const targetTs = new Date(vlDate + 'T12:00:00Z').getTime() / 1000;
-  let pointRef = points[0];
-  let minDiff = Math.abs(points[0].timestamp - targetTs);
-
-  for (let i = 1; i < points.length; i++) {
-    const diff = Math.abs(points[i].timestamp - targetTs);
-    if (diff < minDiff) {
-      minDiff = diff;
-      pointRef = points[i];
-    }
-  }
-
-  const coursRef = valeurPoint(pointRef);
-  if (!coursRef || !coursActuel) return;
-
-  const variation = (coursActuel - coursRef) / coursRef;
-  const vlActuelle = vlRef * (1 + variation);
-  const estVert = vlActuelle >= vlRef;
-  const pourcentage = (variation * 100).toFixed(2);
-
-  document.getElementById('resultat_vl').innerHTML = 'Valeur actuelle estimée : <br>'
-    + '<b style="font-size:1.4rem;color:' + (estVert ? 'var(--vert)' : 'var(--rouge)') + '">' + formaterNombre(vlActuelle) + ' €</b>'
-    + '<br><span style="font-size:0.9rem;color:' + (estVert ? 'var(--vert)' : 'var(--rouge)') + '">'
-    + (estVert ? '▲ +' : '▼ ') + pourcentage + '% par rapport au ' + new Date(vlDate).toLocaleDateString('fr-FR') + '</span>';
-}
-
-function parserRSS(xml) {
-  try {
-    const doc = new DOMParser().parseFromString(xml, 'application/xml');
-    return [...doc.querySelectorAll('item')].slice(0, 10).map((i) => ({
-      titre: (i.querySelector('title')?.textContent || '').trim(),
-      lien: (i.querySelector('link')?.textContent || '').trim(),
-      date: (i.querySelector('pubDate')?.textContent || '').trim()
-    })).filter((a) => a.titre);
-  } catch (e) { return []; }
+// ---------- Actualités (Google Actualités en français + Yahoo Finance en anglais) ----------
+const SOURCES_ACTUS = [
+  ['Google Actualités', 'https://news.google.com/rss/search?q=Novartis+when:7d&hl=fr&gl=FR&ceid=FR:fr'],
+  ['Yahoo Finance', 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=NVS&region=US&lang=en-US'],
+];
+function lireRSS(xml, origine) {
+  const doc = new DOMParser().parseFromString(xml, 'text/xml');
+  if (doc.querySelector('parsererror')) return [];
+  return [...doc.querySelectorAll('item')].map((it) => {
+    const txt = (s) => { const e = it.querySelector(s); return e ? e.textContent.trim() : ''; };
+    const source = txt('source') || origine;
+    let titre = txt('title');
+    if (titre.endsWith(' - ' + source)) titre = titre.slice(0, -(source.length + 3));
+    return { titre, lien: txt('link'), date: Date.parse(txt('pubDate')) || 0, source };
+  }).filter((x) => x.titre);
 }
 async function chargerActus() {
-  const textes = await Promise.all([
-    lire(URL_NEWS_FR).catch(() => ''),
-    lire(URL_NEWS_EN).catch(() => '')
-  ]);
-  return [...parserRSS(textes[0]), ...parserRSS(textes[1])]
-    .filter((a, i, arr) => arr.findIndex((x) => x.titre === a.titre) === i)
-    .sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0))
-    .slice(0, 15);
-}
-function afficherActus(actus) {
-  const el = document.getElementById('actus');
-  if (!actus || !actus.length) { el.innerHTML = '<div style="color:#6B7785">Aucune actu.</div>'; return; }
-  el.innerHTML = actus.map((a) => {
-    const score = analyserTitre(a.titre);
-    const cls = score > 0 ? 'actu-pos' : (score < 0 ? 'actu-neg' : '');
-    const signe = score > 0 ? '+' + score : (score < 0 ? String(score) : '');
-    return '<div data-lien="' + (a.lien || '') + '"><div class="actu-titre">' + a.titre + '</div><div class="actu-meta">' + (a.date ? new Date(a.date).toLocaleDateString('fr-FR') : '') + ' <span class="' + cls + '">' + signe + '</span></div></div>';
-  }).join('');
-}
-document.getElementById('actus').addEventListener('click', (e) => {
-  const d = e.target.closest('[data-lien]');
-  if (!d || !d.dataset.lien) return;
-  if (window.Android && Android.ouvrirLien) Android.ouvrirLien(d.dataset.lien);
-  else window.open(d.dataset.lien, '_blank');
-});
-
-function dessinerGraphique(points) {
-  const canvas = document.getElementById('graphique');
-  const ctx = canvas.getContext('2d');
-  const dpr = window.devicePixelRatio || 1;
-  const largeur = canvas.width = canvas.clientWidth * dpr;
-  const hauteur = canvas.height = canvas.clientHeight * dpr;
-  ctx.clearRect(0, 0, largeur, hauteur);
-  if (!points || points.length < 2) return;
-
-  const clotures = points.map(valeurPoint).filter((v) => v != null);
-  const min = Math.min(...clotures), max = Math.max(...clotures);
-  const marge = (max - min) * 0.08 || 1;
-  const x = (i) => (i / (points.length - 1 || 1)) * (largeur - 40) + 20;
-  const y = (v) => hauteur - 20 - ((v - (min - marge)) / ((max + marge) - (min - marge))) * (hauteur - 40);
-
-  // MM200
-  const mm200 = smaSerie(points, 200);
-  ctx.strokeStyle = '#8E44AD';
-  ctx.lineWidth = 1.5 * dpr;
-  ctx.beginPath();
-  let started = false;
-  for (let i = 0; i < points.length; i++) {
-    if (mm200[i] == null) continue;
-    if (!started) { ctx.moveTo(x(i), y(mm200[i])); started = true; }
-    else ctx.lineTo(x(i), y(mm200[i]));
-  }
-  ctx.stroke();
-
-  // MM50
-  const mm50 = smaSerie(points, 50);
-  ctx.strokeStyle = '#E67E22';
-  ctx.lineWidth = 1.5 * dpr;
-  ctx.beginPath();
-  started = false;
-  for (let i = 0; i < points.length; i++) {
-    if (mm50[i] == null) continue;
-    if (!started) { ctx.moveTo(x(i), y(mm50[i])); started = true; }
-    else ctx.lineTo(x(i), y(mm50[i]));
-  }
-  ctx.stroke();
-
-  // Prix
-  ctx.strokeStyle = '#0B5FA5';
-  ctx.lineWidth = 2.2 * dpr;
-  ctx.beginPath();
-  points.forEach((p, i) => {
-    const v = valeurPoint(p);
-    if (v == null) return;
-    if (i === 0) ctx.moveTo(x(i), y(v));
-    else ctx.lineTo(x(i), y(v));
-  });
-  ctx.stroke();
-}
-
-function afficherTableau(points, intervalle) {
-  // Limite à 80 derniers points pour la fluidité
-  const affiches = points.slice(-80);
-  document.getElementById('tableau').innerHTML = affiches.map((p) =>
-    `<tr><td>${formaterDate(p.timestamp, intervalle)}</td><td>${formaterNombre(p.open)}</td><td>${formaterNombre(p.high)}</td><td>${formaterNombre(p.low)}</td><td>${formaterNombre(p.close)}</td><td>${formaterNombre(p.adjclose)}</td><td>${formaterNombre(p.volume)}</td></tr>`
-  ).join('');
-}
-
-function afficher(erreurMsg) {
-  const intervalle = document.getElementById('intervalle').value;
-  const periode = document.getElementById('periode').value;
-  const j1 = etat.jeux['1d'];
-  const j2 = etat.jeux['1h'];
-
-  mettreAJourVL(j1);
-
-  if (!j1 || !j1.points || !j1.points.length) {
-    document.getElementById('message').textContent = erreurMsg || 'Aucune donnée. Clique sur « Tout actualiser ».';
-    afficherSignal(null);
-    afficherActus([]);
-    document.getElementById('backtest').textContent = '—';
-    return;
-  }
-
-  const jeu = (intervalle === '1h' && j2 && j2.points && j2.points.length) ? j2 : j1;
-  const points = filtrerPoints(jeu.points, periode, Date.now());
-  document.getElementById('message').textContent = points.length + ' points affichés / ' + jeu.points.length + ' en cache.';
-
-  dessinerGraphique(points);
-  afficherTableau(points, intervalle);
-  afficherActus(etat.actus);
-
-  const s = calculerSignal(j1.points, j2 ? j2.points : null, etat.actus);
-  afficherSignal(s);
-
-  // Backtest (journalier uniquement pour stabilité et performance)
-  const bt = lancerBacktest(j1.points);
-  if (bt && bt.trades > 0) {
-    document.getElementById('backtest').innerHTML =
-      'Sur l’historique disponible : <b>' + bt.trades + ' signaux d’achat</b><br>'
-      + '✅ Taux de réussite : <b>' + bt.winRate + '%</b> (' + bt.gagnants + ' gagnants)<br>'
-      + '📈 Performance moyenne : <b>' + (bt.gainMoyen >= 0 ? '+' : '') + bt.gainMoyen + '%</b> (horizon max 20 j + SL/TP)';
-  } else {
-    document.getElementById('backtest').textContent = bt && bt.msg ? bt.msg : 'Pas assez de données pour le backtest.';
-  }
-
-  // Notification uniquement sur changement de signal Haute confiance
-  const ancienSignal = localStorage.getItem('novartis.dernierSignal');
-  if (ancienSignal !== s.signal && s.confiance === 'Haute') {
-    if (window.Android && Android.notifier) Android.notifier('Novartis : ' + s.signal, s.explication);
-    localStorage.setItem('novartis.dernierSignal', s.signal);
-  }
-}
-
-async function telechargerJeu(jeu) {
-  const url = URL_BASE_GITHUB + 'cours_' + jeu.cle + '.json';
-  const texte = await lire(url);
-  if (!texte || texte.trim() === '') throw new Error('Fichier GitHub vide.');
-
-  let data;
-  try { data = JSON.parse(texte); } catch (e) { throw new Error('JSON invalide.'); }
-  if (!data.chart || !data.chart.result || !data.chart.result[0]) throw new Error('Données introuvables.');
-
-  const r = data.chart.result[0];
-  const timestamps = r.timestamp || [];
-  const q = r.indicators.quote[0] || {};
-  const adj = (r.indicators.adjclose && r.indicators.adjclose[0]) || {};
-  const points = [];
-  for (let i = 0; i < timestamps.length; i++) {
-    if (q.close[i] == null) continue;
-    points.push({
-      timestamp: timestamps[i],
-      open: q.open ? q.open[i] : q.close[i],
-      high: q.high ? q.high[i] : q.close[i],
-      low: q.low ? q.low[i] : q.close[i],
-      close: q.close[i],
-      adjclose: adj.adjclose ? adj.adjclose[i] : q.close[i],
-      volume: q.volume ? q.volume[i] : 0
-    });
-  }
-  return { points, devise: 'USD' };
-}
-
-async function toutActualiser() {
-  const bouton = document.getElementById('charger');
-  bouton.disabled = true;
-  document.getElementById('message').textContent = '';
-  let faits = 0;
+  const reps = await Promise.all(SOURCES_ACTUS.map(([, url]) => lire(url)));
   const erreurs = [];
+  let liste = [];
+  reps.forEach((r, i) => {
+    if (r.statut === 200) liste = liste.concat(lireRSS(r.corps, SOURCES_ACTUS[i][0]));
+    else erreurs.push(SOURCES_ACTUS[i][0] + (r.statut ? ' (erreur ' + r.statut + ')' : ' (pas de réponse)'));
+  });
+  const vus = {};
+  liste = liste.filter((x) => { const k = x.titre.toLowerCase(); if (vus[k]) return false; vus[k] = 1; return true; })
+    .sort((x, y) => y.date - x.date).slice(0, 12);
+  return { liste, erreurs };
+}
 
-  for (const jeu of JEUX) {
-    document.getElementById('progression').textContent = 'Téléchargement ' + jeu.libelle + '…';
-    try {
-      const data = await telechargerJeu(jeu);
-      etat.jeux[jeu.cle] = { points: data.points, devise: data.devise, dateMax: Date.now() };
-      ecrireCache(jeu.cle, data);
-      faits++;
-    } catch (e) {
-      erreurs.push(jeu.libelle + ' : ' + e.message);
+// ---------- Calculs (testés par le contrôle qualité en bas) ----------
+function chfVersEur(prixChf, eurChf) { return prixChf / eurChf; }
+function estimerVL(vlRef, prixRefEur, prixEur) { return vlRef * prixEur / prixRefEur; }
+function ecartPct(reel, estime) { return (reel / estime - 1) * 100; }
+// dernière séance au plus tard ce jour-là (une VL d’un samedi prend le cours du vendredi) ; -1 si avant l’historique
+function indexAuJour(serie, jourISO) {
+  let k = -1;
+  for (let i = 0; i < serie.j.length; i++) { if (serie.j[i] <= jourISO) k = i; else break; }
+  return k;
+}
+// dernier cours connu à cet instant (sert au taux de change, pour ne pas prendre celui du lendemain)
+function valeurAuMoment(serie, ts) {
+  let v = null;
+  for (let i = 0; i < serie.t.length; i++) { if (serie.t[i] <= ts) v = serie.c[i]; else break; }
+  return v;
+}
+// prix d’une action Novartis de Zurich en €, à la clôture d’un jour donné (cours ajusté des dividendes)
+function prixEurAuJour(d, jourISO) {
+  const k = indexAuJour(d.novn, jourISO);
+  if (k < 0) return null;
+  const fx = valeurAuMoment(d.eurchf, d.novn.t[k] + 6 * 3600); // taux du même jour, jamais celui du lendemain
+  return fx ? chfVersEur(d.novn.a[k], fx) : null;
+}
+function calculFCPE(d, vlRef, vlDate) {
+  const prixRef = prixEurAuJour(d, vlDate);
+  if (!prixRef) return { erreur: 'La date de ta VL est plus ancienne que l’historique chargé (2 ans) : mets une VL plus récente.' };
+  const prix = chfVersEur(dernier(d.novn.c), dernier(d.eurchf.c));
+  const vl = estimerVL(vlRef, prixRef, prix);
+  return { vl, variationPct: (vl / vlRef - 1) * 100 };
+}
+function moyenneMobile(valeurs, n) {
+  const x = nombres(valeurs), out = new Array(x.length).fill(null);
+  let s = 0;
+  for (let i = 0; i < x.length; i++) {
+    s += x[i];
+    if (i >= n) s -= x[i - n];
+    if (i >= n - 1) out[i] = s / n;
+  }
+  return out;
+}
+function sma(valeurs, n) { const m = moyenneMobile(valeurs, n); return m.length ? m[m.length - 1] : null; }
+function rsi(valeurs, n) {
+  n = n || 14;
+  const x = nombres(valeurs);
+  if (x.length < n + 1) return null;
+  let g = 0, p = 0;
+  for (let i = 1; i <= n; i++) { const d = x[i] - x[i - 1]; if (d > 0) g += d; else p -= d; }
+  g /= n; p /= n;
+  for (let i = n + 1; i < x.length; i++) {
+    const d = x[i] - x[i - 1];
+    g = (g * (n - 1) + (d > 0 ? d : 0)) / n;
+    p = (p * (n - 1) + (d < 0 ? -d : 0)) / n;
+  }
+  if (p === 0) return g === 0 ? 50 : 100;
+  return 100 - 100 / (1 + g / p);
+}
+function volatiliteAnnuelle(valeurs) { // écart type des variations quotidiennes × √252, en %
+  const x = nombres(valeurs);
+  if (x.length < 3) return null;
+  const r = [];
+  for (let i = 1; i < x.length; i++) r.push(Math.log(x[i] / x[i - 1]));
+  const m = r.reduce((s, v) => s + v, 0) / r.length;
+  const v = r.reduce((s, y) => s + (y - m) * (y - m), 0) / (r.length - 1);
+  return Math.sqrt(v * SEANCES_AN) * 100;
+}
+function dernierCroisement(court, long, jours) { // depuis quand la MM courte est du même côté de la longue
+  let i = court.length - 1;
+  if (court[i] == null || long[i] == null) return null;
+  const dessus = court[i] > long[i];
+  while (i > 0 && court[i - 1] != null && long[i - 1] != null && (court[i - 1] > long[i - 1]) === dessus) i--;
+  return { dessus, jour: jours[i], depuisDebut: i === 0 || court[i - 1] == null || long[i - 1] == null };
+}
+function parAn(multiplicateur, annees) { return (Math.pow(multiplicateur, 1 / annees) - 1) * 100; }
+// signal[i] = 1 (investi) ou 0, décidé à la clôture du jour i et exécuté à la clôture du jour i+1
+function backtest(prix, signal, frais) {
+  let capital = 1, pos = 0, ordres = 0, sommet = 1, pire = 0, joursInvesti = 0;
+  for (let j = 1; j < prix.length; j++) {
+    if (pos) { capital *= prix[j] / prix[j - 1]; joursInvesti++; }
+    const cible = signal[j - 1] ? 1 : 0;
+    if (cible !== pos) { capital *= 1 - frais; pos = cible; ordres++; }
+    if (capital > sommet) sommet = capital;
+    if (capital / sommet - 1 < pire) pire = capital / sommet - 1;
+  }
+  const annees = (prix.length - 1) / SEANCES_AN;
+  return { gainPct: (capital - 1) * 100, parAnPct: parAn(capital, annees), pireChutePct: pire * 100, ordres, investiPct: joursInvesti / Math.max(1, prix.length - 1) * 100 };
+}
+function testerStrategies(nvs) {
+  const a = nvs.a, n = a.length;
+  const mm50 = moyenneMobile(a, 50), mm200 = moyenneMobile(a, 200);
+  let debut = Math.max(0, n - 1 - 5 * SEANCES_AN);
+  while (debut < n && mm200[debut] == null) debut++;
+  if (n - debut < SEANCES_AN) return null;
+  const prix = a.slice(debut);
+  const regles = [
+    ['Je garde', prix.map(() => 1)],
+    ['Cours > MM200', prix.map((p, i) => (p > mm200[debut + i] ? 1 : 0))],
+    ['MM50 > MM200', prix.map((p, i) => (mm50[debut + i] > mm200[debut + i] ? 1 : 0))],
+  ];
+  return { depuis: nvs.j[debut], annees: (prix.length - 1) / SEANCES_AN, resultats: regles.map(([nom, s]) => [nom, backtest(prix, s, FRAIS)]) };
+}
+
+// ---------- Affichage ----------
+function maj(t) { id('maj').textContent = t; }
+function etatEntete() {
+  if (!DANS_APPLI) return 'Aperçu : les cours se chargent seulement dans l’appli, sur le téléphone.';
+  if (etat.enCours) return 'Mise à jour…';
+  const d = etat.donnees;
+  return (d && d.quand ? 'Mis à jour ' + quand(d.quand) : 'Pas encore de cours.') + (etat.erreurs.length ? ' ⚠️ ' + etat.erreurs.join(' ; ') : '');
+}
+
+function remplirChamps() {
+  const v = localStorage.getItem(CLE.vlRef), p = localStorage.getItem(CLE.parts);
+  id('vlRef').value = v ? String(v).replace('.', ',') : '';
+  id('vlDate').value = localStorage.getItem(CLE.vlDate) || '';
+  id('parts').value = p ? String(p).replace('.', ',') : '';
+}
+
+function afficherFCPE() {
+  const vlRef = lireNombre(localStorage.getItem(CLE.vlRef)), vlDate = localStorage.getItem(CLE.vlDate) || '';
+  const parts = lireNombre(localStorage.getItem(CLE.parts)), d = etat.donnees;
+  const c = lireJSON(CLE.controle);
+  id('vlControle').textContent = c ? 'Contrôle : pour le ' + dateFR(c.jour) + ', l’appli prévoyait ' + formaterNombre(c.estime) + '\u00a0€, la vraie VL était '
+    + formaterNombre(c.reel, 3) + '\u00a0€ (écart ' + pct(c.ecart, 2) + ')' + (Math.abs(c.ecart) > 2 ? '. Écart important : vérifie la date de tes VL.' : '.') : '';
+  const vide = (t) => { id('vlEstimee').textContent = '— €'; id('vlVariation').textContent = t; id('vlTotal').textContent = ''; };
+  if (!vlRef || !vlDate) return vide('Entre ta dernière VL et sa date (relevé Natixis), puis Enregistrer.');
+  if (!d || !d.novn || !d.eurchf) return vide('En attente des cours…');
+  const r = calculFCPE(d, vlRef, vlDate);
+  if (r.erreur) return vide(r.erreur);
+  id('vlEstimee').textContent = formaterNombre(r.vl) + '\u00a0€';
+  id('vlVariation').innerHTML = '<span class="' + classe(r.variationPct) + '">' + pct(r.variationPct, 2) + '</span> depuis ta VL du ' + dateFR(vlDate) + ' (' + formaterNombre(vlRef, 3) + '\u00a0€)';
+  id('vlTotal').innerHTML = parts ? 'Mes ' + formaterNombre(parts, 4) + ' parts ≈ <b>' + formaterNombre(parts * r.vl) + '\u00a0€</b> <span style="white-space:nowrap" class="' + classe(r.vl - vlRef) + '">('
+    + (r.vl >= vlRef ? '+' : '') + formaterNombre(parts * (r.vl - vlRef)) + '\u00a0€)</span>' : '';
+}
+
+function variationJour(s) { return s && s.c.length > 1 ? (s.c[s.c.length - 1] / s.c[s.c.length - 2] - 1) * 100 : null; }
+function afficherCours() {
+  const d = etat.donnees || {};
+  const prix = (s, unite) => (s ? formaterNombre(dernier(s.c)) + '\u00a0' + unite + ' <span class="' + classe(variationJour(s)) + '">' + pct(variationJour(s)) + '</span>' : '—');
+  id('prixNovn').innerHTML = prix(d.novn, 'CHF');
+  id('prixNvs').innerHTML = prix(d.nvs, '$');
+  id('prixNvsEur').textContent = d.nvs && d.eurusd ? formaterNombre(dernier(d.nvs.c) / dernier(d.eurusd.c)) + '\u00a0€' : '—';
+  id('change').textContent = d.eurchf ? '1\u00a0€ = ' + formaterNombre(dernier(d.eurchf.c), 4) + '\u00a0CHF' + (d.eurusd ? ' · ' + formaterNombre(dernier(d.eurusd.c), 4) + '\u00a0$' : '') : '—';
+  id('seances').textContent = (d.novn && d.nvs ? 'Dernières séances : ' + dateFR(dernier(d.novn.j)) + ' à Zurich, ' + dateFR(dernier(d.nvs.j)) + ' à New York (variation sur la séance). ' : '')
+    + 'Cours différés d’environ 15 à 20 minutes.';
+}
+
+function afficherReperes() {
+  const nvs = etat.donnees && etat.donnees.nvs, el = id('reperes');
+  if (!nvs) { el.textContent = '—'; return; }
+  const c = nvs.c, n = c.length, prix = c[n - 1];
+  const mm50 = moyenneMobile(c, 50), mm200 = moyenneMobile(c, 200);
+  if (mm200[n - 1] == null) { el.textContent = 'Pas assez d’historique pour les repères.'; return; }
+  const ecart = (prix / mm200[n - 1] - 1) * 100;
+  const cr = dernierCroisement(mm50, mm200, nvs.j);
+  const r = rsi(c, 14);
+  const an = c.slice(-SEANCES_AN), haut = Math.max(...an), bas = Math.min(...an);
+  const vol = volatiliteAnnuelle(c.slice(-(SEANCES_AN + 1)));
+  const ligne = (titre, detail, valeur, cls) => '<div class="ligne"><div><div>' + titre + '</div><div class="doux">' + detail + '</div></div><b class="' + (cls || '') + '">' + valeur + '</b></div>';
+  el.innerHTML =
+    ligne('Tendance de fond', 'Cours à ' + pct(ecart) + ' de sa moyenne 200 jours', ecart >= 0 ? 'Haussière' : 'Baissière', ecart >= 0 ? 'hausse' : 'baisse')
+    + ligne('Moyen terme', 'Moyenne 50 j ' + (cr.dessus ? 'au-dessus' : 'en dessous') + ' de la 200 j ' + (cr.depuisDebut ? 'depuis au moins le ' : 'depuis le ') + dateFR(cr.jour),
+      cr.dessus ? 'Positif' : 'Négatif', cr.dessus ? 'hausse' : 'baisse')
+    + ligne('Élan (RSI 14 j)', r >= 70 ? 'Surchauffe : forte hausse sur 14 jours' : (r <= 30 ? 'Survente : forte baisse sur 14 jours' : 'Neutre (surchauffe au-dessus de 70, survente en dessous de 30)'),
+      formaterNombre(r, 0))
+    + ligne('Sur 1 an', 'Plus haut ' + formaterNombre(haut) + '\u00a0$ · plus bas ' + formaterNombre(bas) + '\u00a0$', pct((prix / haut - 1) * 100) + ' du haut')
+    + ligne('Agitation', 'Volatilité ' + formaterNombre(vol, 0) + '\u00a0%/an : environ 2 mois sur 3, le cours bouge moins que ça', '±' + formaterNombre(vol / Math.sqrt(12), 1) + '\u00a0%/mois');
+}
+
+function afficherBacktest() {
+  const nvs = etat.donnees && etat.donnees.nvs, el = id('backtest');
+  if (!nvs) { el.textContent = '—'; return; }
+  const t = testerStrategies(nvs);
+  if (!t) { el.textContent = 'Pas assez d’historique pour le test.'; return; }
+  const garde = t.resultats[0][1];
+  const lignes = t.resultats.map(([nom, r]) => '<tr><td>' + nom + '</td><td class="' + classe(r.gainPct) + '">' + pct(r.gainPct, 0) + '<small>' + pct(r.parAnPct) + '/an</small></td><td>'
+    + pct(r.pireChutePct, 0) + '</td><td>' + r.ordres + '<small>investi ' + formaterNombre(r.investiPct, 0) + '\u00a0%</small></td></tr>').join('');
+  const regles = t.resultats.slice(1);
+  const meilleure = regles.reduce((m, x) => (x[1].gainPct > m[1].gainPct ? x : m));
+  const plusSure = regles.reduce((m, x) => (x[1].pireChutePct > m[1].pireChutePct ? x : m));
+  let conclusion;
+  if (meilleure[1].gainPct > garde.gainPct) {
+    conclusion = '«\u00a0' + meilleure[0] + '\u00a0» a fait mieux que «\u00a0je garde\u00a0» sur cette période (' + pct(meilleure[1].gainPct, 0) + ' contre ' + pct(garde.gainPct, 0) + ').';
+  } else {
+    conclusion = 'Aucune de ces règles n’a fait mieux que «\u00a0je garde\u00a0» sur cette période : acheter et vendre sur ces signaux t’aurait moins rapporté.';
+    if (plusSure[1].pireChutePct > garde.pireChutePct + 1) conclusion += ' En échange, «\u00a0' + plusSure[0] + '\u00a0» a limité la pire chute (' + pct(plusSure[1].pireChutePct, 0) + ' au lieu de ' + pct(garde.pireChutePct, 0) + ').';
+  }
+  el.innerHTML = '<div class="doux" style="margin-bottom:6px">Depuis le ' + dateFR(t.depuis) + ' (' + formaterNombre(t.annees, 1) + ' ans) :</div>'
+    + '<table><thead><tr><th>Règle</th><th>Gain</th><th>Pire chute</th><th>Ordres</th></tr></thead><tbody>' + lignes + '</tbody></table>'
+    + '<div style="margin-top:10px;color:var(--txt)">' + conclusion + '</div>'
+    + '<div class="note">«\u00a0Cours > MM200\u00a0» : investi seulement quand le cours est au-dessus de sa moyenne 200 jours. «\u00a0MM50 > MM200\u00a0» : investi quand la moyenne 50 jours est au-dessus de la 200 jours.</div>';
+}
+
+function dessiner() {
+  const nvs = etat.donnees && etat.donnees.nvs, cv = id('graphique'), ctx = cv.getContext('2d');
+  const dpr = window.devicePixelRatio || 1, L = cv.clientWidth, H = cv.clientHeight;
+  cv.width = Math.round(L * dpr); cv.height = Math.round(H * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, L, H);
+  etat.graphe = null;
+  if (!nvs || nvs.c.length < 2 || L < 50) { id('pointe').textContent = ''; return; }
+  const nb = Math.min(+id('periode').value, nvs.c.length), deb = nvs.c.length - nb;
+  const c = nvs.c.slice(deb), m50 = moyenneMobile(nvs.c, 50).slice(deb), m200 = moyenneMobile(nvs.c, 200).slice(deb);
+  let min = Infinity, max = -Infinity;
+  [c, m50, m200].forEach((s) => s.forEach((v) => { if (v != null) { if (v < min) min = v; if (v > max) max = v; } }));
+  const marge = (max - min) * 0.06 || 1; min -= marge; max += marge;
+  const gauche = 40, droite = 8, haut = 8, bas = 22;
+  const X = (i) => gauche + (nb > 1 ? i / (nb - 1) : 0) * (L - gauche - droite);
+  const Y = (v) => haut + (1 - (v - min) / (max - min)) * (H - haut - bas);
+  const st = getComputedStyle(document.documentElement), coul = (n, def) => st.getPropertyValue(n).trim() || def;
+  ctx.font = '11px system-ui,sans-serif'; ctx.lineWidth = 1;
+  ctx.strokeStyle = coul('--bord', '#D8DEE3'); ctx.fillStyle = coul('--doux', '#5F6B76');
+  for (let k = 0; k <= 3; k++) {
+    const v = min + (max - min) * k / 3, y = Y(v);
+    ctx.beginPath(); ctx.moveTo(gauche, y); ctx.lineTo(L - droite, y); ctx.stroke();
+    ctx.fillText(formaterNombre(v, 0), 2, y + 4);
+  }
+  const fin = dateFR(dernier(nvs.j));
+  ctx.fillText(dateFR(nvs.j[deb]), gauche, H - 6);
+  ctx.fillText(fin, L - droite - ctx.measureText(fin).width, H - 6);
+  const trace = (s, couleur, ep) => {
+    ctx.strokeStyle = couleur; ctx.lineWidth = ep; ctx.beginPath();
+    let parti = false;
+    s.forEach((v, i) => { if (v == null) return; if (!parti) { ctx.moveTo(X(i), Y(v)); parti = true; } else ctx.lineTo(X(i), Y(v)); });
+    ctx.stroke();
+  };
+  trace(m200, coul('--mm200', '#8E44AD'), 1.5);
+  trace(m50, coul('--mm50', '#E67E22'), 1.5);
+  trace(c, coul('--courbe', '#0B5FA5'), 2);
+  etat.graphe = { gauche, droite, L, nb };
+  const i = etat.pointe;
+  if (i != null && i >= 0 && i < nb) {
+    ctx.strokeStyle = coul('--doux', '#5F6B76'); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(X(i), haut); ctx.lineTo(X(i), H - bas); ctx.stroke();
+    ctx.fillStyle = coul('--courbe', '#0B5FA5'); ctx.beginPath(); ctx.arc(X(i), Y(c[i]), 4, 0, 2 * Math.PI); ctx.fill();
+    id('pointe').textContent = dateFR(nvs.j[deb + i]) + ' : ' + formaterNombre(c[i]) + '\u00a0$' + (m50[i] != null ? ' · MM50 ' + formaterNombre(m50[i]) : '') + (m200[i] != null ? ' · MM200 ' + formaterNombre(m200[i]) : '');
+  } else id('pointe').textContent = 'Touche la courbe pour voir un jour précis.';
+}
+
+function afficherActus() {
+  const a = etat.donnees && etat.donnees.actus, el = id('actus');
+  if (!a) { el.textContent = DANS_APPLI ? '—' : 'Les actus se chargent dans l’appli.'; return; }
+  el.innerHTML = (a.liste.map((x, i) => '<div class="actu" data-i="' + i + '"><b>' + echapper(x.titre) + '</b><span class="doux">' + echapper(x.source) + (x.date ? ' · ' + quand(x.date) : '') + '</span></div>').join('')
+    || '<div>Aucune actu sur les 7 derniers jours.</div>')
+    + (a.erreurs.length ? '<div class="note">Indisponible : ' + echapper(a.erreurs.join(', ')) + '</div>' : '');
+}
+
+function toutAfficher() {
+  [afficherFCPE, afficherCours, afficherReperes, afficherBacktest, dessiner, afficherActus].forEach(sur);
+  maj(etatEntete());
+}
+
+// ---------- Mise à jour des cours ----------
+async function actualiser() {
+  if (!DANS_APPLI) { maj(etatEntete()); return; }
+  if (etat.enCours) return;
+  etat.enCours = true; id('actualiser').disabled = true; maj(etatEntete());
+  const demandes = [['novn', 'NOVN.SW', '2y'], ['eurchf', 'EURCHF=X', '2y'], ['nvs', 'NVS', '10y'], ['eurusd', 'EURUSD=X', '5d']];
+  const [series, actus] = await Promise.all([Promise.allSettled(demandes.map(([, s, p]) => chargerSerie(s, p))),
+    chargerActus().catch((e) => ({ liste: [], erreurs: ['actus : ' + ((e && e.message) || e)] }))]);
+  const d = Object.assign({}, etat.donnees || {}); // une série en échec garde sa version précédente
+  const erreurs = [];
+  let horsLigne = 0;
+  series.forEach((r, i) => {
+    if (r.status === 'fulfilled') { d[demandes[i][0]] = r.value; return; }
+    const e = r.reason || {};
+    erreurs.push(String(e.message || e));
+    if (e.reseau) horsLigne++;
+    else console.error('Cours Yahoo en échec — ' + (e.message || e) + (e.detail ? ' — réponse : ' + e.detail : ''));
+  });
+  if (actus.liste.length || !d.actus) d.actus = actus;
+  if (horsLigne < demandes.length) d.quand = Date.now();
+  etat.donnees = d;
+  etat.erreurs = horsLigne === demandes.length ? ['pas de connexion'] : erreurs;
+  try { localStorage.setItem(CLE.donnees, JSON.stringify(d)); } catch (e) { }
+  etat.enCours = false; id('actualiser').disabled = false;
+  toutAfficher();
+}
+
+// ---------- Boutons ----------
+id('actualiser').onclick = () => actualiser();
+id('enregistrerVL').onclick = () => {
+  const msg = (t) => { id('vlMessage').textContent = t; };
+  const v = lireNombre(id('vlRef').value), jour = id('vlDate').value, texteParts = id('parts').value.trim();
+  const p = texteParts === '' ? null : lireNombre(texteParts);
+  if (!v || v <= 0) return msg('VL invalide : écris par exemple 109,657');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(jour)) return msg('Choisis la date de cette VL.');
+  if (jour > aujourdhui()) return msg('La date de la VL ne peut pas être dans le futur.');
+  if (texteParts !== '' && (p == null || p < 0)) return msg('Nombre de parts invalide : écris par exemple 152,3846');
+  // contrôle : ce que l’appli avait estimé pour cette nouvelle date, à partir de l’ancienne VL
+  const ancienneV = lireNombre(localStorage.getItem(CLE.vlRef)), ancienneD = localStorage.getItem(CLE.vlDate), d = etat.donnees;
+  if (ancienneV && ancienneD && jour > ancienneD && d && d.novn && d.eurchf) {
+    const p1 = prixEurAuJour(d, ancienneD), p2 = prixEurAuJour(d, jour);
+    if (p1 && p2) {
+      const estime = estimerVL(ancienneV, p1, p2);
+      localStorage.setItem(CLE.controle, JSON.stringify({ jour, estime, reel: v, ecart: ecartPct(v, estime) }));
     }
   }
-
-  document.getElementById('progression').textContent = 'Actualités…';
-  try {
-    etat.actus = await chargerActus();
-    localStorage.setItem(CLE_ACTUS, JSON.stringify({ dateMax: Date.now(), actus: etat.actus }));
-  } catch (e) {
-    erreurs.push('Actualités : ' + e.message);
-  }
-
-  // Invalider le cache backtest
-  try { localStorage.removeItem(CLE_BACKTEST); } catch (e) {}
-
-  bouton.disabled = false;
-  document.getElementById('progression').textContent = '';
-
-  if (erreurs.length > 0) {
-    afficher('❌ Erreur(s) : ' + erreurs.join(' | '));
-  } else {
-    afficher();
-  }
-}
-
-document.getElementById('vider').onclick = () => {
-  if (confirm('Effacer toutes les données sauvegardées et repartir à zéro ?')) {
-    localStorage.clear();
-    etat.jeux = {};
-    etat.actus = [];
-    etat.backtestCache = null;
-    document.getElementById('vl_ref').value = '';
-    document.getElementById('vl_date').value = '';
-    document.getElementById('resultat_vl').innerHTML = 'Valeur actuelle estimée : <br><b style="font-size:1.4rem;color:var(--prim)">— €</b>';
-    document.getElementById('message').textContent = '✅ Cache vidé. Clique sur « Tout actualiser ».';
-    document.getElementById('progression').textContent = '';
-    document.getElementById('backtest').textContent = '—';
-    document.getElementById('actus').innerHTML = '';
-    afficher();
-  }
+  localStorage.setItem(CLE.vlRef, String(v));
+  localStorage.setItem(CLE.vlDate, jour);
+  if (p == null) localStorage.removeItem(CLE.parts); else localStorage.setItem(CLE.parts, String(p));
+  if (A && A.vibrer) A.vibrer(30);
+  msg('Enregistré ✓');
+  remplirChamps();
+  sur(afficherFCPE);
 };
-
-document.getElementById('intervalle').addEventListener('change', () => { afficher(); });
-document.getElementById('periode').addEventListener('change', () => { afficher(); });
-document.getElementById('charger').onclick = () => { toutActualiser(); };
-
-const caseAuto = document.getElementById('auto');
-caseAuto.checked = localStorage.getItem(CLE_AUTO) !== '0';
-caseAuto.addEventListener('change', () => {
-  localStorage.setItem(CLE_AUTO, caseAuto.checked ? '1' : '0');
-  if (window.Android && Android.activerServiceFond) Android.activerServiceFond(caseAuto.checked);
+id('actus').addEventListener('click', (e) => {
+  const el = e.target.closest('[data-i]'), a = etat.donnees && etat.donnees.actus;
+  const x = el && a && a.liste[+el.dataset.i];
+  if (!x || !x.lien) return;
+  if (A && A.ouvrirLien) A.ouvrirLien(x.lien); else window.open(x.lien, '_blank');
+});
+const toile = id('graphique');
+function viser(e) {
+  const g = etat.graphe;
+  if (!g) return;
+  const x = e.clientX - toile.getBoundingClientRect().left;
+  etat.pointe = Math.max(0, Math.min(g.nb - 1, Math.round((x - g.gauche) / (g.L - g.gauche - g.droite) * (g.nb - 1))));
+  sur(dessiner);
+}
+toile.addEventListener('pointerdown', viser);
+toile.addEventListener('pointermove', (e) => { if (e.buttons) viser(e); });
+id('periode').onchange = () => { etat.pointe = null; sur(dessiner); };
+let minuterieTaille = null;
+window.addEventListener('resize', () => { clearTimeout(minuterieTaille); minuterieTaille = setTimeout(() => sur(dessiner), 150); });
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && DANS_APPLI && etat.donnees && Date.now() - (etat.donnees.quand || 0) > 10 * 60000) actualiser();
 });
 
-// Chargement initial depuis le cache
-for (const jeu of JEUX) {
-  const cache = lireCache(jeu.cle);
-  if (cache) etat.jeux[jeu.cle] = cache;
-}
-try {
-  const cacheActus = localStorage.getItem(CLE_ACTUS);
-  if (cacheActus) etat.actus = JSON.parse(cacheActus).actus || [];
-} catch (e) {}
-
-afficher();
-if (caseAuto.checked && window.Android && Android.activerServiceFond) Android.activerServiceFond(true);
-if (JEUX.every((j) => !etat.jeux[j.cle])) toutActualiser();
+// ---------- Démarrage : on montre tout de suite les derniers cours connus, puis on met à jour ----------
+etat.donnees = lireJSON(CLE.donnees);
+remplirChamps();
+toutAfficher();
+if (DANS_APPLI && (!etat.donnees || Date.now() - (etat.donnees.quand || 0) > 10 * 60000)) actualiser();
 
 // ===== CONTRÔLE QUALITÉ — NE JAMAIS MODIFIER UN CAS POUR LE FAIRE PASSER =====
 const normaliserEspaces = (s) => String(s).replace(/[\u202f\u00a0\u2009]/g, ' ');
@@ -932,23 +684,28 @@ function controleQualite() {
     ['Formatage 2.5 → 2,50', () => normaliserEspaces(formaterNombre(2.5)), '2,50'],
     ['RSI croissant = 100', () => rsi(Array.from({ length: 20 }, (_, i) => ({ close: 100 + i })), 14), 100],
     ['RSI décroissant = 0', () => rsi(Array.from({ length: 20 }, (_, i) => ({ close: 200 - i })), 14), 0],
-    ['Analyse « approval » → +1', () => analyserTitre('approval'), 1],
-    ['Analyse « lawsuit » → -1', () => analyserTitre('lawsuit'), -1],
     ['SMA 3 points simples', () => sma([{close:10},{close:20},{close:30}], 3), 20],
+    ['100 CHF avec 1 € = 0,93 CHF → 107,53 €', () => chfVersEur(100, 0.93), 107.53],
+    ['VL 109,657 € et action +2 % en euros → 111,85 €', () => estimerVL(109.657, 100, 102), 111.85],
+    ['Action stable à 90 CHF, 1 € passe de 0,94 à 0,92 CHF → VL 100 devient 102,17', () => estimerVL(100, chfVersEur(90, 0.94), chfVersEur(90, 0.92)), 102.17],
+    ['« 109,657 » avec une virgule se lit 109,657', () => lireNombre('109,657'), 109.657],
+    ['« 12a » est refusé', () => lireNombre('12a'), null],
+    ['VL d’un samedi → séance du vendredi', () => indexAuJour({ j: ['2026-10-29', '2026-10-30', '2026-11-02'] }, '2026-10-31'), 1],
+    ['Taux de change pris à l’heure de la séance, pas le suivant', () => valeurAuMoment({ t: [100, 200, 300], c: [0.93, 0.94, 0.95] }, 250), 0.94],
+    ['Toujours investi : achat à 100, fin à 110 → +10 %', () => backtest([100, 100, 110, 121, 110], [1, 1, 1, 1, 1], 0).gainPct, 10],
+    ['Revente à 121 avec 1 % de frais par ordre → +18,59 %', () => backtest([100, 100, 110, 121, 110], [1, 1, 0, 0, 0], 0.01).gainPct, 18.59],
+    ['Pire chute 120 → 90 = −25 %', () => backtest([100, 120, 90, 130, 104], [1, 1, 1, 1, 1], 0).pireChutePct, -25],
+    ['+21 % en 2 ans = +10 % par an', () => parAn(1.21, 2), 10],
   ];
   const ko = [];
   for (const [nom, f, attendu] of cas) {
     let obtenu;
     try { obtenu = f(); } catch (e) { obtenu = 'plantage : ' + e.message; }
-    const ok = typeof attendu === 'number'
-      ? (typeof obtenu === 'number' && Math.abs(obtenu - attendu) < 0.01)
-      : String(obtenu) === String(attendu);
+    const ok = typeof attendu === 'number' ? typeof obtenu === 'number' && Math.abs(obtenu - attendu) < 0.01 : JSON.stringify(obtenu) === JSON.stringify(attendu);
     if (!ok) ko.push(nom + ' : attendu ' + JSON.stringify(attendu) + ', obtenu ' + JSON.stringify(obtenu));
   }
   const el = document.getElementById('controle');
-  if (el) el.textContent = ko.length
-    ? '❌ ' + ko.length + ' contrôle(s) sur ' + cas.length + ' en échec : ' + ko.join(' ; ')
-    : '✅ Tout est conforme (' + cas.length + '/' + cas.length + ')';
+  if (el) el.textContent = ko.length ? '❌ ' + ko.length + ' contrôle(s) sur ' + cas.length + ' en échec : ' + ko.join(' ; ') : '✅ Tout est conforme (' + cas.length + '/' + cas.length + ')';
   for (const k of ko) console.error('Contrôle qualité en échec — ' + k);
 }
 controleQualite();
