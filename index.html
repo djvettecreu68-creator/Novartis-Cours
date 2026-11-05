@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Novartis Cours</title>
+<style>
+:root{--fond:#F3F5F7;--txt:#162028;--prim:#0B5FA5;--carte:#FFFFFF;--bord:#D8DEE3;--rouge:#C0392B;--vert:#1E8449;color-scheme:light}
+@media(prefers-color-scheme:dark){:root{--fond:#12171C;--txt:#E9EEF1;--carte:#1B232B;--bord:#2A3540;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fond);color:var(--txt);font:16px/1.45 system-ui,sans-serif;padding:16px 16px calc(80px + env(safe-area-inset-bottom,0px))}
+h1{font-size:1.45rem;margin:0 0 4px}
+.sous{color:#6B7785;font-size:.9rem;margin-bottom:16px}
+.carte{background:var(--carte);border:1px solid var(--bord);border-radius:18px;padding:16px;margin-bottom:14px}
+select,button{font:inherit;border-radius:12px;border:1px solid var(--bord);padding:10px 12px;background:var(--carte);color:var(--txt)}
+button{background:var(--prim);color:#fff;border:0;font-weight:700;min-height:44px;padding:0 18px}
+button:active{opacity:.85}
+.ligne{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+label{font-size:.95rem}
+canvas{width:100%;height:260px;display:block}
+table{width:100%;border-collapse:collapse;font-size:.88rem}
+th,td{padding:8px 6px;border-bottom:1px solid var(--bord);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{color:#6B7785;font-weight:600}
+#message{font-size:.9rem;color:#6B7785;margin-top:8px;min-height:1.2em}
+#controle{font-size:.78rem;color:#6B7785;padding:10px 2px;text-align:center}
+</style>
+</head>
+<body>
+<h1>Novartis Cours</h1>
+<div class="sous">Historique de l'action Novartis (NVS) — Yahoo Finance</div>
+
+<div class="carte">
+  <div class="ligne">
+    <label for="periode">Afficher</label>
+    <select id="periode">
+      <option value="1mo">1 mois</option>
+      <option value="3mo" selected>3 mois</option>
+      <option value="6mo">6 mois</option>
+      <option value="1y">1 an</option>
+      <option value="5y">5 ans</option>
+      <option value="max">Tout l'historique</option>
+    </select>
+    <button id="charger">Actualiser</button>
+  </div>
+  <div class="ligne" style="margin-top:10px">
+    <input type="checkbox" id="horsligne" style="width:22px;height:22px">
+    <label for="horsligne">Mode hors-ligne : aucune requête, relit seulement l'historique sauvegardé</label>
+  </div>
+  <div id="message"></div>
+</div>
+
+<div class="carte">
+  <canvas id="graphique"></canvas>
+</div>
+
+<div class="carte" style="overflow-x:auto">
+  <table>
+    <thead>
+      <tr><th>Date</th><th>Ouverture</th><th>Plus haut</th><th>Plus bas</th><th>Clôture</th><th>Volume</th></tr>
+    </thead>
+    <tbody id="tableau"></tbody>
+  </table>
+</div>
+
+<div id="controle"></div>
+
+<script>
+// Mouchard v3 — signale à Playstoore les erreurs de l'écran, les appels au serveur en échec,
+// et les problèmes que tu signales toi-même (secoue le téléphone, ou appui long sur le titre).
+(function () {
+  if (window.__mouchard) return;
+  window.__mouchard = 3;
+  const gestes = [], dejaVu = {};
+  const heure = () => new Date().toLocaleTimeString('fr-FR');
+  const couper = (t, n) => { t = String(t == null ? '' : t); return t.length > n ? t.slice(0, n) + '…' : t; };
+  const noter = (t) => { gestes.push(heure() + ' ' + couper(t, 160)); if (gestes.length > 12) gestes.shift(); };
+  const photo = () => {
+    const champs = [...document.querySelectorAll('input, select, textarea')]
+      .filter((c) => !c.closest('#__signal') && c.type !== 'password')
+      .slice(0, 20).map((c) => '#' + (c.id || c.name || c.tagName.toLowerCase()) + ' = « ' + couper(c.type === 'checkbox' ? c.checked : c.value, 60) + ' »');
+    const donnees = {};
+    try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); donnees[k] = couper(localStorage.getItem(k), 400); } } catch (e) { }
+    return { gestes: gestes.slice(), champs, ecran: couper(((document.body && document.body.innerText) || '').replace(/\n{2,}/g, '\n'), 1500),
+      donnees: couper(JSON.stringify(donnees), 2000), appareil: couper(navigator.userAgent, 200), titre: document.title };
+  };
+  const envoyer = (type, message, ligne, colonne, pile, plus) => {
+    if (!ligne && pile) { const m = String(pile).match(/:(\d+):(\d+)\)?\s*$/m); if (m) { ligne = +m[1]; colonne = +m[2]; } }
+    const cle = type + '|' + message + '|' + ligne, maintenant = Date.now();
+    if (dejaVu[cle] && maintenant - dejaVu[cle] < 3000) return false;
+    dejaVu[cle] = maintenant;
+    if (!(window.Android && Android.signalerErreur)) return false;
+    Android.signalerErreur(JSON.stringify(Object.assign({ type, message: couper(message, 500), ligne: ligne || 0, colonne: colonne || 0,
+      pile: couper(pile, 1500) }, photo(), plus || {})));
+    return true;
+  };
+  const bulle = (t) => {
+    const b = document.createElement('div');
+    b.textContent = t;
+    b.style.cssText = 'position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:14px;z-index:2147483647;font:15px system-ui,sans-serif';
+    document.body.appendChild(b); setTimeout(() => b.remove(), 2600);
+  };
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('button, a, input, select, label, [onclick], [role="button"]');
+    if (!b || b.closest('#__signal')) return;
+    const texte = (b.innerText || b.value || b.getAttribute('aria-label') || '').trim().replace(/\s+/g, ' ').slice(0, 40);
+    noter('touche « ' + (texte || b.tagName.toLowerCase()) + ' »' + (b.id ? ' (#' + b.id + ')' : ''));
+  }, true);
+  document.addEventListener('change', (e) => {
+    const c = e.target; if (!c || !c.tagName || c.closest('#__signal')) return;
+    noter('change ' + c.tagName.toLowerCase() + (c.id ? ' #' + c.id : '') + (c.type === 'password' ? '' : ' = « ' + String(c.type === 'checkbox' ? c.checked : c.value).slice(0, 30) + ' »'));
+  }, true);
+  if (window.fetch) {
+    const fetchAvant = window.fetch;
+    window.fetch = async (...a) => {
+      const u = String((a[0] && a[0].url) || a[0]).slice(0, 120), m = ((a[1] && a[1].method) || 'GET').toUpperCase();
+      try {
+        const r = await fetchAvant(...a);
+        noter('appel ' + m + ' ' + u + ' → ' + r.status);
+        if (r.status >= 400) r.clone().text().then((t) => envoyer(r.status >= 500 ? 'serveur' : 'reseau',
+          (r.status >= 500 ? 'Le serveur a répondu ' : 'Réponse ') + r.status + ' à ' + m + ' ' + u, 0, 0, '', { reponse: couper(t, 800) })).catch(() => { });
+        return r;
+      } catch (err) {
+        noter('appel ' + m + ' ' + u + ' → échec réseau (' + err.message + ')');
+        envoyer('reseau', 'Échec réseau sur ' + m + ' ' + u + ' : ' + err.message, 0, 0, '');
+        throw err;
+      }
+    };
+  }
+  window.addEventListener('error', (e) => envoyer('ecran', e.message || 'Erreur', e.lineno, e.colno, e.error && e.error.stack));
+  window.addEventListener('unhandledrejection', (e) => { const r = e.reason; envoyer('ecran', 'Promesse rejetée : ' + ((r && r.message) || r), 0, 0, r && r.stack); });
+  const consoleErreur = console.error;
+  console.error = (...a) => { consoleErreur.apply(console, a); envoyer('console', 'console.error : ' + a.map(String).join(' '), 0, 0, new Error().stack); };
+  function ouvrirSignalement() {
+    if (document.getElementById('__signal')) return;
+    noter('ouvre « Signaler un problème »');
+    const instantane = photo();
+    const d = document.createElement('div');
+    d.id = '__signal';
+    d.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;font:16px/1.4 system-ui,sans-serif';
+    d.innerHTML = '<div style="background:#fff;color:#111;width:100%;max-width:560px;border-radius:20px 20px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:12px">'
+      + '<b style="font-size:1.15rem">🐞 Signaler un problème</b>'
+      + '<span style="color:#555;font-size:.9rem">Dis en une phrase ce qui ne va pas. L’écran, tes derniers gestes et les données partent avec, pour l’IA.</span>'
+      + '<textarea id="__signalTexte" rows="3" style="font:inherit;color:#111;background:#fff;border:1px solid #bbb;border-radius:12px;padding:10px" placeholder="Ex. : le graphique est vide ou les dates sont fausses"></textarea>'
+      + '<div style="display:flex;gap:10px"><button id="__signalNon" style="flex:1;height:46px;border:0;border-radius:23px;background:#e6e6e6;color:#111;font:inherit;font-weight:700">Annuler</button>'
+      + '<button id="__signalOui" style="flex:2;height:46px;border:0;border-radius:23px;background:#D2463A;color:#fff;font:inherit;font-weight:700">Envoyer</button></div></div>';
+    document.body.appendChild(d);
+    const zone = d.querySelector('#__signalTexte');
+    setTimeout(() => zone.focus(), 50);
+    d.querySelector('#__signalNon').onclick = () => d.remove();
+    d.querySelector('#__signalOui').onclick = () => {
+      const texte = zone.value.trim();
+      if (!texte) { zone.focus(); return; }
+      d.remove();
+      const ok = !!(window.Android && Android.signalerErreur);
+      if (ok) Android.signalerErreur(JSON.stringify(Object.assign({ type: 'signalement', message: couper(texte, 500), ligne: 0, colonne: 0, pile: '' }, instantane)));
+      bulle(ok ? '🐞 Envoyé à Playstoore' : 'Mouchard indisponible ici');
+    };
+  }
+  window.ouvrirSignalement = ouvrirSignalement;
+  let minuteur = null;
+  document.addEventListener('touchstart', (e) => { if (e.target.closest && e.target.closest('h1')) minuteur = setTimeout(ouvrirSignalement, 800); }, { passive: true });
+  ['touchend', 'touchmove', 'touchcancel'].forEach((t) => document.addEventListener(t, () => clearTimeout(minuteur), { passive: true }));
+  document.addEventListener('contextmenu', (e) => { if (e.target.closest && e.target.closest('h1')) { e.preventDefault(); ouvrirSignalement(); } });
+  noter('ouverture de l’appli');
+})();
+
+// ===== APPLICATION NOVARTIS =====
+const WORKER = 'https://novartis-cours.djvettecreu68.workers.dev';
+const canvas = document.getElementById('graphique');
+const ctx = canvas.getContext('2d');
+const tableau = document.getElementById('tableau');
+const message = document.getElementById('message');
+
+const CLE_CACHE = 'novartis.historique.v1';
+const CLE_HORS_LIGNE = 'novartis.horsligne';
+const etat = { points: [], devise: 'USD', dateMax: 0 };
+
+function dessinerGraphique(points) {
+  const largeur = canvas.width = canvas.clientWidth * (window.devicePixelRatio || 1);
+  const hauteur = canvas.height = canvas.clientHeight * (window.devicePixelRatio || 1);
+  ctx.clearRect(0, 0, largeur, hauteur);
+  if (!points.length) return;
+  const clotures = points.map((p) => p.close).filter((v) => v != null);
+  if (!clotures.length) return;
+  const min = Math.min(...clotures), max = Math.max(...clotures);
+  const marge = (max - min) * 0.1 || 1;
+  const bas = min - marge, haut = max + marge;
+  const x = (i) => (i / (points.length - 1 || 1)) * (largeur - 40) + 20;
+  const y = (v) => hauteur - 20 - ((v - bas) / (haut - bas)) * (hauteur - 40);
+  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--prim').trim() || '#0B5FA5';
+  ctx.lineWidth = 2 * (window.devicePixelRatio || 1);
+  ctx.beginPath();
+  points.forEach((p, i) => {
+    if (p.close == null) return;
+    if (i === 0 || points[i - 1].close == null) ctx.moveTo(x(i), y(p.close));
+    else ctx.lineTo(x(i), y(p.close));
+  });
+  ctx.stroke();
+}
+
+function formaterNombre(v) {
+  if (v == null || isNaN(v)) return '—';
+  return Number(v).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function afficherTableau(points) {
+  tableau.innerHTML = points.map((p) => {
+    const date = new Date(p.timestamp * 1000).toLocaleDateString('fr-FR');
+    return `<tr><td>${date}</td><td>${formaterNombre(p.open)}</td><td>${formaterNombre(p.high)}</td><td>${formaterNombre(p.low)}</td><td>${formaterNombre(p.close)}</td><td>${p.volume != null ? Number(p.volume).toLocaleString('fr-FR') : '—'}</td></tr>`;
+  }).join('');
+}
+
+// filtre purement local (aucune requête) : renvoie les points dans la période demandée
+function filtrerPoints(points, periode, maintenantMs) {
+  if (!points || !points.length) return [];
+  if (periode === 'max') return points.slice();
+  const moisParPeriode = { '1mo': 1, '3mo': 3, '6mo': 6, '1y': 12, '5y': 60 };
+  const mois = moisParPeriode[periode];
+  if (!mois) return points.slice();
+  const d = new Date(maintenantMs || Date.now());
+  d.setUTCMonth(d.getUTCMonth() - mois);
+  const seuil = Math.floor(d.getTime() / 1000);
+  return points.filter((p) => p.timestamp >= seuil);
+}
+
+function lireCache() {
+  try {
+    const brut = localStorage.getItem(CLE_CACHE);
+    if (!brut) return null;
+    const data = JSON.parse(brut);
+    if (!data || !Array.isArray(data.points) || !data.points.length) return null;
+    return data;
+  } catch (e) {
+    return null;
+  }
+}
+
+function ecrireCache(data) {
+  try {
+    localStorage.setItem(CLE_CACHE, JSON.stringify({ devise: data.devise || 'USD', dateMax: Date.now(), points: data.points }));
+    return true;
+  } catch (e) {
+    message.textContent = 'Impossible de sauvegarder l’historique : ' + e.message;
+    return false;
+  }
+}
+
+function afficher() {
+  const periode = document.getElementById('periode').value;
+  const points = filtrerPoints(etat.points, periode, Date.now());
+  tableau.innerHTML = '';
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!points.length) {
+    message.textContent = etat.points.length
+      ? 'Aucune donnée dans cette période.'
+      : 'Aucun historique sauvegardé. Appuie sur « Actualiser » avec le réseau pour le télécharger une seule fois.';
+    return;
+  }
+  const quand = etat.dateMax ? new Date(etat.dateMax).toLocaleString('fr-FR') : '—';
+  const origine = etat.dateMax ? 'sauvegardé le ' + quand : 'en mémoire';
+  message.textContent = points.length + ' points affichés / ' + etat.points.length + ' en historique — ' + origine + ' — devise : ' + etat.devise;
+  dessinerGraphique(points);
+  afficherTableau(points);
+}
+
+async function actualiser() {
+  if (document.getElementById('horsligne').checked) {
+    message.textContent = 'Mode hors-ligne activé : aucune requête envoyée. Décoche la case pour actualiser.';
+    return;
+  }
+  message.textContent = 'Actualisation… (une seule requête, tout l’historique)';
+  try {
+    const r = await fetch(`${WORKER}/historique?range=max&interval=1d`);
+    if (!r.ok) throw new Error('Réponse ' + r.status);
+    const data = await r.json();
+    if (!data.points || !data.points.length) {
+      message.textContent = 'Le serveur n’a renvoyé aucun point.';
+      return;
+    }
+    etat.points = data.points;
+    etat.devise = data.devise || 'USD';
+    etat.dateMax = Date.now();
+    ecrireCache(data);
+    afficher();
+  } catch (e) {
+    message.textContent = 'Erreur réseau : ' + e.message + (etat.points.length ? ' — historique sauvegardé toujours consultable.' : '');
+  }
+}
+
+document.getElementById('periode').addEventListener('change', () => { afficher(); });
+document.getElementById('charger').onclick = () => { actualiser(); };
+const caseHL = document.getElementById('horsligne');
+caseHL.checked = localStorage.getItem(CLE_HORS_LIGNE) === '1';
+caseHL.addEventListener('change', () => { try { localStorage.setItem(CLE_HORS_LIGNE, caseHL.checked ? '1' : '0'); } catch (e) { } });
+window.addEventListener('resize', () => { if (etat.points.length) afficher(); });
+
+const cacheDemarrage = lireCache();
+if (cacheDemarrage) {
+  etat.points = cacheDemarrage.points;
+  etat.devise = cacheDemarrage.devise || 'USD';
+  etat.dateMax = cacheDemarrage.dateMax || 0;
+  afficher();
+} else if (!caseHL.checked) {
+  actualiser();
+} else {
+  afficher();
+}
+
+// ===== CONTRÔLE QUALITÉ — NE JAMAIS MODIFIER UN CAS POUR LE FAIRE PASSER =====
+const normaliserEspaces = (s) => String(s).replace(/[\u202f\u00a0\u2009]/g, ' ');
+const MAINTENANT_TEST = Date.UTC(2026, 0, 15, 12, 0, 0); // 15 janvier 2026, 12:00 UTC
+const POINTS_TEST = [
+  { timestamp: Math.floor(Date.UTC(2025, 0, 15, 12, 0, 0) / 1000) },  // 15 janv. 2025
+  { timestamp: Math.floor(Date.UTC(2025, 6, 15, 12, 0, 0) / 1000) },  // 15 juil. 2025
+  { timestamp: Math.floor(Date.UTC(2025, 9, 15, 12, 0, 0) / 1000) },  // 15 oct. 2025
+  { timestamp: Math.floor(Date.UTC(2025, 11, 15, 12, 0, 0) / 1000) }, // 15 déc. 2025
+  { timestamp: Math.floor(Date.UTC(2020, 0, 15, 12, 0, 0) / 1000) }, // 15 janv. 2020
+];
+function controleQualite() {
+  const cas = [
+    ['Formatage 2.5 → 2,50', () => normaliserEspaces(formaterNombre(2.5)), '2,50'],
+    ['Formatage 1000 → 1 000,00', () => normaliserEspaces(formaterNombre(1000)), '1 000,00'],
+    ['Formatage null → —', () => formaterNombre(null), '—'],
+    ['Formatage NaN → —', () => formaterNombre(NaN), '—'],
+    ['Formatage 0 → 0,00', () => formaterNombre(0), '0,00'],
+    ['Filtre 1 mois garde 1 point', () => filtrerPoints(POINTS_TEST, '1mo', MAINTENANT_TEST).length, 1],
+    ['Filtre 3 mois garde 2 points', () => filtrerPoints(POINTS_TEST, '3mo', MAINTENANT_TEST).length, 2],
+    ['Filtre 6 mois garde 3 points', () => filtrerPoints(POINTS_TEST, '6mo', MAINTENANT_TEST).length, 3],
+    ['Filtre 1 an garde 4 points', () => filtrerPoints(POINTS_TEST, '1y', MAINTENANT_TEST).length, 4],
+    ['Filtre 5 ans exclut le point 2020', () => filtrerPoints(POINTS_TEST, '5y', MAINTENANT_TEST).length, 4],
+    ['Filtre max garde les 5 points', () => filtrerPoints(POINTS_TEST, 'max', MAINTENANT_TEST).length, 5],
+    ['Filtre liste vide renvoie 0', () => filtrerPoints([], '1y', MAINTENANT_TEST).length, 0],
+  ];
+  const ko = [];
+  for (const [nom, f, attendu] of cas) {
+    let obtenu;
+    try { obtenu = f(); } catch (e) { obtenu = 'plantage : ' + e.message; }
+    const ok = typeof attendu === 'number'
+      ? typeof obtenu === 'number' && Math.abs(obtenu - attendu) < 0.01
+      : String(obtenu) === String(attendu);
+    if (!ok) ko.push(nom + ' : attendu ' + JSON.stringify(attendu) + ', obtenu ' + JSON.stringify(obtenu));
+  }
+  const el = document.getElementById('controle');
+  if (el) el.textContent = ko.length
+    ? '❌ ' + ko.length + ' contrôle(s) sur ' + cas.length + ' en échec : ' + ko.join(' ; ')
+    : '✅ Tout est conforme (' + cas.length + '/' + cas.length + ')';
+  for (const k of ko) console.error('Contrôle qualité en échec — ' + k);
+}
+controleQualite();
+// ===== FIN DU CONTRÔLE QUALITÉ =====
+</script>
+</body>
+</html>
