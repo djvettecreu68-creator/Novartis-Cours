@@ -214,6 +214,7 @@ const JEUX = [
   { cle: '1d', interval: '1d', range: 'max', libelle: 'Journalier' },
   { cle: '1h', interval: '1h', range: '2y', libelle: 'Horaire' }
 ];
+const URL_BASE_GITHUB = 'https://raw.githubusercontent.com/hack68/Novartis-Cours/main/';
 const URL_NEWS_FR = 'https://news.google.com/rss/search?q=Novartis+when:7d&hl=fr&gl=FR&ceid=FR:fr';
 const URL_NEWS_EN = 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=NVS&region=US&lang=en-US';
 
@@ -631,16 +632,15 @@ function afficher(erreurMsg) {
 }
 
 async function telechargerJeu(jeu) {
-  // On alterne entre query1 et query2 pour éviter le blocage
-  const domain = Math.random() > 0.5 ? 'query1' : 'query2';
-  const url = 'https://' + domain + '.finance.yahoo.com/v8/finance/chart/NVS?range=' + jeu.range + '&interval=' + jeu.interval + '&includePrePost=false&events=div%2Csplits';
-  
+  // L'appli lit le fichier JSON stocké sur GitHub (mis à jour par le workflow)
+  const url = URL_BASE_GITHUB + 'cours_' + jeu.cle + '.json';
   const texte = await lire(url);
-  if (!texte || texte.trim() === '') throw new Error('Réponse vide.');
-  if (texte.includes("Too Many Requests") || texte.includes("429")) throw new Error('Yahoo est surchargé (429). Réessaie dans 1 min.');
+  if (!texte || texte.trim() === '') throw new Error('Fichier GitHub vide.');
+  
   let data;
   try { data = JSON.parse(texte); } catch (e) { throw new Error('JSON invalide.'); }
   if (!data.chart || !data.chart.result || !data.chart.result[0]) throw new Error('Données introuvables.');
+  
   const r = data.chart.result[0];
   const timestamps = r.timestamp || [];
   const q = r.indicators.quote[0] || {};
@@ -678,8 +678,6 @@ async function toutActualiser() {
     } catch (e) {
       erreurs.push(jeu.libelle + ' : ' + e.message);
     }
-    // Petite pause de 1.5s entre les requêtes pour ne pas se faire bloquer
-    await new Promise(r => setTimeout(r, 1500));
   }
 
   document.getElementById('progression').textContent = 'Actualités…';

@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    - cron: '0 * * * *' # Mise à jour des cours toutes les heures
 
 permissions:
   contents: write
@@ -13,18 +15,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Miroir GitHub - Téléchargement des cours
+        run: |
+          curl -s "https://query1.finance.yahoo.com/v8/finance/chart/NVS?range=max&interval=1d" -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)" -o cours_1d.json
+          curl -s "https://query1.finance.yahoo.com/v8/finance/chart/NVS?range=2y&interval=1h" -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)" -o cours_1h.json
+          
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add cours_1d.json cours_1h.json
+          git commit -m "Mise à jour automatique des cours" || echo "Aucun nouveau cours"
+          git push || echo "Rien à pousser"
 
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Clé de signature (créée UNE seule fois, puis gardée dans le dépôt)
+      - name: Clé de signature
         run: |
           if [ ! -f signature.keystore ]; then
             keytool -genkeypair -keystore signature.keystore -storetype PKCS12 -alias appli -keyalg RSA -keysize 2048 -validity 20000 -storepass novartis123 -keypass novartis123 -dname "CN=Novartis Cours"
-            git config user.name "github-actions"
-            git config user.email "github-actions@users.noreply.github.com"
             git add signature.keystore
             git commit -m "Clé de signature"
             git push
@@ -250,8 +264,7 @@ jobs:
                           String corps = ""; int statut = 0;
                           try {
                               java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
-                              c.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
-                              c.setRequestProperty("Accept", "application/json, text/csv, */*");
+                              c.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
                               c.setConnectTimeout(15000); c.setReadTimeout(20000);
                               statut = c.getResponseCode();
                               java.io.InputStream is = (statut >= 400) ? c.getErrorStream() : c.getInputStream();
