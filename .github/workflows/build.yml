@@ -376,7 +376,7 @@ jobs:
           public class ServiceFond extends Service {
               Handler handler;
               Runnable tache;
-              int minutes = 30;
+              int minutes = 45;
 
               @Override
               public void onCreate() {
@@ -387,8 +387,9 @@ jobs:
                       getSystemService(NotificationManager.class).createNotificationChannel(ch);
                       Notification n = new Notification.Builder(this, "novartis_service")
                           .setContentTitle("Novartis Cours actif")
-                          .setContentText("Surveille le marché en arrière-plan.")
+                          .setContentText("Surveillance active – les données sont rafraîchies côté serveur.")
                           .setSmallIcon(android.R.drawable.ic_menu_compass)
+                          .setOngoing(true)
                           .build();
                       startForeground(1, n);
                   }
@@ -397,7 +398,10 @@ jobs:
               @Override
               public int onStartCommand(Intent intent, int flags, int startId) {
                   if (tache != null) return START_STICKY;
+                  // Le vrai rafraîchissement des cours est fait par GitHub Actions (horaire).
+                  // Ce service maintient juste le processus vivant et la notification visible.
                   tache = () -> {
+                      // On se contente de se rescheduler proprement
                       handler.postDelayed(tache, minutes * 60 * 1000L);
                   };
                   handler.postDelayed(tache, minutes * 60 * 1000L);

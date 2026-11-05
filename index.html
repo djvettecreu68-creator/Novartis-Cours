@@ -18,7 +18,7 @@ button:active{opacity:.85}
 button:disabled{opacity:.5}
 .ligne{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 label{font-size:.95rem}
-canvas{width:100%;height:260px;display:block}
+canvas{width:100%;height:280px;display:block}
 table{width:100%;border-collapse:collapse;font-size:.85rem}
 th,td{padding:7px 5px;border-bottom:1px solid var(--bord);text-align:right;white-space:nowrap}
 th:first-child,td:first-child{text-align:left}
@@ -38,6 +38,9 @@ th{color:#6B7785;font-weight:600;font-size:.8rem}
 #actus .actu-neg{color:var(--rouge);font-weight:700}
 .risque-box{margin-top:10px;padding:12px;background:rgba(11,95,165,.08);border-radius:12px;font-size:.85rem;border-left:4px solid var(--prim)}
 .risque-box b{display:block;margin-bottom:4px}
+.legende{display:flex;gap:14px;flex-wrap:wrap;font-size:.78rem;color:#6B7785;margin-top:8px}
+.legende span{display:flex;align-items:center;gap:5px}
+.legende i{display:inline-block;width:14px;height:3px;border-radius:2px}
 </style>
 </head>
 <body>
@@ -100,12 +103,17 @@ th{color:#6B7785;font-weight:600;font-size:.8rem}
 </div>
 
 <div class="carte">
-  <div style="font-size:1.1rem;font-weight:700;margin-bottom:8px">Backtesting (5 dernières années)</div>
+  <div style="font-size:1.1rem;font-weight:700;margin-bottom:8px">Backtesting (données journalières)</div>
   <div id="backtest" style="font-size:.9rem;color:#6B7785">Calcul en cours…</div>
 </div>
 
 <div class="carte">
   <canvas id="graphique"></canvas>
+  <div class="legende">
+    <span><i style="background:#0B5FA5"></i> Cours</span>
+    <span><i style="background:#E67E22"></i> MM50</span>
+    <span><i style="background:#8E44AD"></i> MM200</span>
+  </div>
 </div>
 
 <div class="carte">
@@ -114,6 +122,7 @@ th{color:#6B7785;font-weight:600;font-size:.8rem}
 </div>
 
 <div class="carte" style="overflow-x:auto">
+  <div style="font-size:.8rem;color:#6B7785;margin-bottom:6px">80 derniers points affichés</div>
   <table>
     <thead>
       <tr><th>Date</th><th>Ouv.</th><th>Haut</th><th>Bas</th><th>Clôt.</th><th>Ajusté</th><th>Vol.</th></tr>
@@ -125,14 +134,16 @@ th{color:#6B7785;font-weight:600;font-size:.8rem}
 <div id="controle"></div>
 
 <script>
-// Mouchard v3
+// Mouchard v3 — signale à Playstoore les erreurs de l'écran, les appels au serveur en échec,
+// et les problèmes que tu signales toi-même (secoue le téléphone, ou appui long sur le titre).
 (function () {
-  if (window.__mouchard) return; window.__mouchard = 3;
+  if (window.__mouchard) return;
+  window.__mouchard = 3;
   const gestes = [], dejaVu = {};
   const heure = () => new Date().toLocaleTimeString('fr-FR');
   const couper = (t, n) => { t = String(t == null ? '' : t); return t.length > n ? t.slice(0, n) + '…' : t; };
   const noter = (t) => { gestes.push(heure() + ' ' + couper(t, 160)); if (gestes.length > 12) gestes.shift(); };
-  const photo = () => {
+  const etat = () => {
     const champs = [...document.querySelectorAll('input, select, textarea')]
       .filter((c) => !c.closest('#__signal') && c.type !== 'password')
       .slice(0, 20).map((c) => '#' + (c.id || c.name || c.tagName.toLowerCase()) + ' = « ' + couper(c.type === 'checkbox' ? c.checked : c.value, 60) + ' »');
@@ -148,8 +159,14 @@ th{color:#6B7785;font-weight:600;font-size:.8rem}
     dejaVu[cle] = maintenant;
     if (!(window.Android && Android.signalerErreur)) return false;
     Android.signalerErreur(JSON.stringify(Object.assign({ type, message: couper(message, 500), ligne: ligne || 0, colonne: colonne || 0,
-      pile: couper(pile, 1500) }, photo(), plus || {})));
+      pile: couper(pile, 1500) }, etat(), plus || {})));
     return true;
+  };
+  const bulle = (t) => {
+    const b = document.createElement('div');
+    b.textContent = t;
+    b.style.cssText = 'position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:14px;z-index:2147483647;font:15px system-ui,sans-serif';
+    document.body.appendChild(b); setTimeout(() => b.remove(), 2600);
   };
   document.addEventListener('click', (e) => {
     const b = e.target.closest && e.target.closest('button, a, input, select, label, [onclick], [role="button"]');
@@ -159,36 +176,60 @@ th{color:#6B7785;font-weight:600;font-size:.8rem}
   }, true);
   document.addEventListener('change', (e) => {
     const c = e.target; if (!c || !c.tagName || c.closest('#__signal')) return;
-    noter('change ' + c.tagName.toLowerCase() + (c.id ? ' #' + c.id : '') + ' = « ' + String(c.type === 'checkbox' ? c.checked : c.value).slice(0, 30) + ' »');
+    noter('change ' + c.tagName.toLowerCase() + (c.id ? ' #' + c.id : '') + (c.type === 'password' ? '' : ' = « ' + String(c.type === 'checkbox' ? c.checked : c.value).slice(0, 30) + ' »'));
   }, true);
+  if (window.fetch) {
+    const fetchAvant = window.fetch;
+    window.fetch = async (...a) => {
+      const u = String((a[0] && a[0].url) || a[0]).slice(0, 120), m = ((a[1] && a[1].method) || 'GET').toUpperCase();
+      try {
+        const r = await fetchAvant(...a);
+        noter('appel ' + m + ' ' + u + ' → ' + r.status);
+        if (r.status >= 400) r.clone().text().then((t) => envoyer(r.status >= 500 ? 'serveur' : 'reseau',
+          (r.status >= 500 ? 'Le serveur a répondu ' : 'Réponse ') + r.status + ' à ' + m + ' ' + u, 0, 0, '', { reponse: couper(t, 800) })).catch(() => { });
+        return r;
+      } catch (err) {
+        noter('appel ' + m + ' ' + u + ' → échec réseau (' + err.message + ')');
+        envoyer('reseau', 'Échec réseau sur ' + m + ' ' + u + ' : ' + err.message, 0, 0, '');
+        throw err;
+      }
+    };
+  }
   window.addEventListener('error', (e) => envoyer('ecran', e.message || 'Erreur', e.lineno, e.colno, e.error && e.error.stack));
   window.addEventListener('unhandledrejection', (e) => { const r = e.reason; envoyer('ecran', 'Promesse rejetée : ' + ((r && r.message) || r), 0, 0, r && r.stack); });
   const consoleErreur = console.error;
   console.error = (...a) => { consoleErreur.apply(console, a); envoyer('console', 'console.error : ' + a.map(String).join(' '), 0, 0, new Error().stack); };
   function ouvrirSignalement() {
-    if (document.getElementById('__signal')) return; noter('ouvre « Signaler un problème »');
-    const instantane = photo();
-    const d = document.createElement('div'); d.id = '__signal';
+    if (document.getElementById('__signal')) return;
+    noter('ouvre « Signaler un problème »');
+    const photo = etat();
+    const d = document.createElement('div');
+    d.id = '__signal';
     d.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;font:16px/1.4 system-ui,sans-serif';
     d.innerHTML = '<div style="background:#fff;color:#111;width:100%;max-width:560px;border-radius:20px 20px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:12px">'
       + '<b style="font-size:1.15rem">🐞 Signaler un problème</b>'
-      + '<span style="color:#555;font-size:.9rem">Dis en une phrase ce qui ne va pas.</span>'
-      + '<textarea id="__signalTexte" rows="3" style="font:inherit;color:#111;background:#fff;border:1px solid #bbb;border-radius:12px;padding:10px" placeholder="Ex. : le backtest ne s’affiche pas"></textarea>'
+      + '<span style="color:#555;font-size:.9rem">Dis en une phrase ce qui ne va pas. L’écran, tes derniers gestes et les données partent avec, pour l’IA.</span>'
+      + '<textarea id="__signalTexte" rows="3" style="font:inherit;color:#111;background:#fff;border:1px solid #bbb;border-radius:12px;padding:10px" placeholder="Ex. : le total est faux, il affiche 105 € au lieu de 15 €"></textarea>'
       + '<div style="display:flex;gap:10px"><button id="__signalNon" style="flex:1;height:46px;border:0;border-radius:23px;background:#e6e6e6;color:#111;font:inherit;font-weight:700">Annuler</button>'
       + '<button id="__signalOui" style="flex:2;height:46px;border:0;border-radius:23px;background:#D2463A;color:#fff;font:inherit;font-weight:700">Envoyer</button></div></div>';
     document.body.appendChild(d);
-    const zone = d.querySelector('#__signalTexte'); setTimeout(() => zone.focus(), 50);
+    const zone = d.querySelector('#__signalTexte');
+    setTimeout(() => zone.focus(), 50);
     d.querySelector('#__signalNon').onclick = () => d.remove();
     d.querySelector('#__signalOui').onclick = () => {
-      const texte = zone.value.trim(); if (!texte) { zone.focus(); return; } d.remove();
+      const texte = zone.value.trim();
+      if (!texte) { zone.focus(); return; }
+      d.remove();
       const ok = !!(window.Android && Android.signalerErreur);
-      if (ok) Android.signalerErreur(JSON.stringify(Object.assign({ type: 'signalement', message: couper(texte, 500), ligne: 0, colonne: 0, pile: '' }, instantane)));
+      if (ok) Android.signalerErreur(JSON.stringify(Object.assign({ type: 'signalement', message: couper(texte, 500), ligne: 0, colonne: 0, pile: '' }, photo)));
+      bulle(ok ? '🐞 Envoyé à Playstoore' : 'Mouchard indisponible ici');
     };
   }
   window.ouvrirSignalement = ouvrirSignalement;
   let minuteur = null;
   document.addEventListener('touchstart', (e) => { if (e.target.closest && e.target.closest('h1')) minuteur = setTimeout(ouvrirSignalement, 800); }, { passive: true });
   ['touchend', 'touchmove', 'touchcancel'].forEach((t) => document.addEventListener(t, () => clearTimeout(minuteur), { passive: true }));
+  document.addEventListener('contextmenu', (e) => { if (e.target.closest && e.target.closest('h1')) { e.preventDefault(); ouvrirSignalement(); } });
   noter('ouverture de l’appli');
 })();
 
@@ -219,10 +260,11 @@ const URL_BASE_GITHUB = 'https://raw.githubusercontent.com/djvettecreu68-creator
 const URL_NEWS_FR = 'https://news.google.com/rss/search?q=Novartis+when:7d&hl=fr&gl=FR&ceid=FR:fr';
 const URL_NEWS_EN = 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=NVS&region=US&lang=en-US';
 
-const PREFIXE_CACHE = 'novartis.v2.';
+const PREFIXE_CACHE = 'novartis.v3.';
 const CLE_AUTO = 'novartis.auto';
 const CLE_ACTUS = 'novartis.actus';
-const etat = { intervalle: '1d', jeux: {}, actus: [] };
+const CLE_BACKTEST = 'novartis.backtest';
+const etat = { intervalle: '1d', jeux: {}, actus: [], backtestCache: null };
 
 function cleCache(cle) { return PREFIXE_CACHE + cle; }
 function lireCache(cle) {
@@ -259,11 +301,23 @@ function formaterDate(ts, intervalle) {
 }
 
 function valeurPoint(p) { return p.adjclose != null ? p.adjclose : p.close; }
+
 function sma(points, n) {
   if (!points || points.length < n) return null;
   let somme = 0;
   for (let i = points.length - n; i < points.length; i++) somme += valeurPoint(points[i]);
   return somme / n;
+}
+function smaSerie(points, n) {
+  const out = new Array(points.length).fill(null);
+  if (!points || points.length < n) return out;
+  let somme = 0;
+  for (let i = 0; i < points.length; i++) {
+    somme += valeurPoint(points[i]);
+    if (i >= n) somme -= valeurPoint(points[i - n]);
+    if (i >= n - 1) out[i] = somme / n;
+  }
+  return out;
 }
 function ema(points, n) {
   const k = 2 / (n + 1); const out = []; let prev = null;
@@ -308,9 +362,9 @@ function atr(points, n) {
     const high = points[i].high, low = points[i].low, prevClose = points[i - 1].close;
     trs.push(Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose)));
   }
-  let atr = trs.slice(0, n).reduce((a, b) => a + b, 0) / n;
-  for (let i = n; i < trs.length; i++) atr = (atr * (n - 1) + trs[i]) / n;
-  return atr;
+  let atrVal = trs.slice(0, n).reduce((a, b) => a + b, 0) / n;
+  for (let i = n; i < trs.length; i++) atrVal = (atrVal * (n - 1) + trs[i]) / n;
+  return atrVal;
 }
 function adx(points, n) {
   n = n || 14;
@@ -332,7 +386,8 @@ function adx(points, n) {
     smoothPlus = smoothPlus - (smoothPlus / n) + plusDM[i];
     smoothMinus = smoothMinus - (smoothMinus / n) + minusDM[i];
     const diPlus = 100 * (smoothPlus / smoothTR), diMinus = 100 * (smoothMinus / smoothTR);
-    dxs.push(100 * Math.abs(diPlus - diMinus) / (diPlus + diMinus));
+    const sum = diPlus + diMinus;
+    dxs.push(sum === 0 ? 0 : 100 * Math.abs(diPlus - diMinus) / sum);
   }
   if (dxs.length < n) return null;
   let adxVal = dxs.slice(0, n).reduce((a, b) => a + b, 0) / n;
@@ -342,8 +397,8 @@ function adx(points, n) {
 
 function analyserTitre(titre) {
   const t = String(titre || '').toLowerCase();
-  const pos = ['beat', 'raise', 'approval', 'success', 'growth', 'upgrade', 'profit', 'breakthrough', 'record', 'approuv', 'hausse', 'bénéfice', 'succès', 'positif'];
-  const neg = ['miss', 'downgrade', 'lawsuit', 'fail', 'recall', 'warning', 'loss', 'drop', 'plunge', 'fall', 'decline', 'reject', 'investigation', 'procès', 'échec', 'chute', 'baisse', 'perte'];
+  const pos = ['beat', 'raise', 'approval', 'success', 'growth', 'upgrade', 'profit', 'breakthrough', 'record', 'approuv', 'hausse', 'bénéfice', 'succès', 'positif', 'positive'];
+  const neg = ['miss', 'downgrade', 'lawsuit', 'fail', 'recall', 'warning', 'loss', 'drop', 'plunge', 'fall', 'decline', 'reject', 'investigation', 'procès', 'échec', 'chute', 'baisse', 'perte', 'negative'];
   let s = 0;
   for (const m of pos) if (t.includes(m)) s++;
   for (const m of neg) if (t.includes(m)) s--;
@@ -351,46 +406,64 @@ function analyserTitre(titre) {
 }
 
 function calculerSignal(journalier, horaire, actus) {
-  if (!journalier || journalier.length < 200 || !horaire || horaire.length < 200) 
-    return { ok: false, raison: 'Pas assez de données pour l\'analyse multi-timeframes.' };
-  
-  const close = valeurPoint(journalier[journalier.length - 1]);
+  if (!journalier || journalier.length < 200) {
+    return { ok: false, raison: 'Pas assez de données journalières (min. 200 points).' };
+  }
+  const closeJ = valeurPoint(journalier[journalier.length - 1]);
   const mm200 = sma(journalier, 200);
   const adxJ = adx(journalier, 14);
   const at = atr(journalier, 14);
-  
-  const rsiH = rsi(horaire, 14);
-  const macdH = macd(horaire);
-  const mm50H = sma(horaire, 50);
-  
+
+  // Momentum horaire (si disponible et assez long)
+  let closeH = closeJ, rsiH = null, macdH = null, mm50H = null;
+  if (horaire && horaire.length >= 60) {
+    closeH = valeurPoint(horaire[horaire.length - 1]);
+    rsiH = rsi(horaire, 14);
+    macdH = macd(horaire);
+    mm50H = sma(horaire, 50);
+  } else {
+    // repli sur journalier
+    rsiH = rsi(journalier, 14);
+    macdH = macd(journalier);
+    mm50H = sma(journalier, 50);
+  }
+
   let score = 0;
   const details = [];
 
+  // Tendance de fond (1D)
   let tendance = 'neutre';
   if (adxJ != null && mm200 != null) {
-    if (close > mm200 && adxJ > 20) tendance = 'haussiere';
-    else if (close < mm200 && adxJ > 20) tendance = 'baissiere';
+    if (closeJ > mm200 && adxJ > 20) tendance = 'haussiere';
+    else if (closeJ < mm200 && adxJ > 20) tendance = 'baissiere';
   }
   let ptsTendance = tendance === 'haussiere' ? 30 : (tendance === 'baissiere' ? -30 : 0);
   score += ptsTendance;
-  details.push({ nom: 'Tendance (1D)', valeur: tendance + ' (ADX ' + (adxJ ? adxJ.toFixed(1) : '—') + ')', pts: ptsTendance });
+  details.push({ nom: 'Tendance (1D)', valeur: tendance + ' (ADX ' + (adxJ != null ? adxJ.toFixed(1) : '—') + ')', pts: ptsTendance });
 
-  let ptsMomentum = (mm50H && close > mm50H) ? 15 : -15;
+  // Momentum
+  let ptsMomentum = (mm50H != null && closeH > mm50H) ? 15 : -15;
   score += ptsMomentum;
-  details.push({ nom: 'Momentum (1H)', valeur: mm50H ? 'Prix ' + (close > mm50H ? '>' : '<') + ' MM50' : '—', pts: ptsMomentum });
+  details.push({ nom: 'Momentum', valeur: mm50H != null ? ('Prix ' + (closeH > mm50H ? '>' : '<') + ' MM50') : '—', pts: ptsMomentum });
 
-  let ptsRSI = rsiH <= 30 ? 25 : (rsiH >= 70 ? -25 : Math.round((50 - rsiH) / 2));
+  // RSI
+  let ptsRSI = 0;
+  if (rsiH != null) {
+    ptsRSI = rsiH <= 30 ? 25 : (rsiH >= 70 ? -25 : Math.round((50 - rsiH) / 2));
+  }
   score += ptsRSI;
-  details.push({ nom: 'RSI (1H)', valeur: rsiH ? rsiH.toFixed(1) : '—', pts: ptsRSI });
+  details.push({ nom: 'RSI', valeur: rsiH != null ? rsiH.toFixed(1) : '—', pts: ptsRSI });
 
-  let ptsMACD = macdH && macdH.histogramme > 0 ? 15 : -15;
+  // MACD
+  let ptsMACD = (macdH && macdH.histogramme > 0) ? 15 : -15;
   score += ptsMACD;
-  details.push({ nom: 'MACD (1H)', valeur: macdH ? macdH.histogramme.toFixed(3) : '—', pts: ptsMACD });
+  details.push({ nom: 'MACD', valeur: macdH ? macdH.histogramme.toFixed(3) : '—', pts: ptsMACD });
 
+  // News
   let scoreNews = 0;
-  for (const actu of actus) scoreNews += analyserTitre(actu.titre);
+  for (const actu of (actus || [])) scoreNews += analyserTitre(actu.titre);
   let bonusNews = Math.max(-20, Math.min(20, scoreNews * 4));
-  details.push({ nom: 'Actualités', valeur: actus.length + ' titres', pts: bonusNews });
+  details.push({ nom: 'Actualités', valeur: (actus || []).length + ' titres', pts: bonusNews });
 
   let scoreFinal = Math.max(-105, Math.min(105, score + bonusNews));
   let signal, couleur, explication, confiance;
@@ -417,29 +490,66 @@ function calculerSignal(journalier, horaire, actus) {
 
   let stopLoss = null, takeProfit = null, ratioRR = null;
   if (at && signal.includes('ACHAT')) {
-    stopLoss = close - (at * 1.5);
-    takeProfit = close + (at * 3);
+    stopLoss = closeJ - (at * 1.5);
+    takeProfit = closeJ + (at * 3);
     ratioRR = '1 : 2';
   }
 
-  return { ok: true, score: scoreFinal, signal, couleur, explication, confiance, details, close, stopLoss, takeProfit, ratioRR };
+  return { ok: true, score: scoreFinal, signal, couleur, explication, confiance, details, close: closeJ, stopLoss, takeProfit, ratioRR };
 }
 
-function lancerBacktest(journalier, horaire) {
+function lancerBacktest(journalier) {
   if (!journalier || journalier.length < 300) return null;
-  let trades = 0, gagnants = 0, gainTotal = 0;
-  for (let i = 200; i < journalier.length - 30; i += 5) {
-    const sJ = journalier.slice(0, i + 1);
-    const sH = sJ; 
-    const s = calculerSignal(sJ, sH, []);
-    if (s.ok && s.signal.includes('ACHAT')) {
-      trades++;
-      const sortie = valeurPoint(journalier[i + 30]);
-      if (sortie > s.close) { gagnants++; gainTotal += (sortie - s.close) / s.close; }
+
+  // Cache simple basé sur le dernier timestamp + longueur
+  const cleCacheBt = journalier.length + '_' + journalier[journalier.length - 1].timestamp;
+  try {
+    const brut = localStorage.getItem(CLE_BACKTEST);
+    if (brut) {
+      const c = JSON.parse(brut);
+      if (c && c.cle === cleCacheBt) return c.resultat;
     }
+  } catch (e) {}
+
+  let trades = 0, gagnants = 0, gainTotal = 0, pertes = 0;
+  const horizon = 20; // jours de détention max
+
+  for (let i = 220; i < journalier.length - horizon; i += 4) {
+    const slice = journalier.slice(0, i + 1);
+    const s = calculerSignal(slice, null, []); // backtest purement journalier pour stabilité
+    if (!s.ok || !s.signal.includes('ACHAT')) continue;
+
+    trades++;
+    const entree = s.close;
+    let sortie = valeurPoint(journalier[i + horizon]);
+    let hit = false;
+
+    // Sortie anticipée si SL ou TP touché
+    if (s.stopLoss != null && s.takeProfit != null) {
+      for (let j = 1; j <= horizon; j++) {
+        const p = journalier[i + j];
+        if (!p) break;
+        if (p.low <= s.stopLoss) { sortie = s.stopLoss; hit = true; break; }
+        if (p.high >= s.takeProfit) { sortie = s.takeProfit; hit = true; break; }
+      }
+    }
+
+    const perf = (sortie - entree) / entree;
+    if (perf > 0) { gagnants++; gainTotal += perf; }
+    else { pertes += perf; }
   }
-  if (trades === 0) return { trades: 0, msg: 'Aucun signal.' };
-  return { trades: trades, winRate: ((gagnants / trades) * 100).toFixed(1), gainMoyen: ((gainTotal / trades) * 100).toFixed(2) };
+
+  const resultat = trades === 0
+    ? { trades: 0, msg: 'Aucun signal d’achat sur la période.' }
+    : {
+        trades,
+        winRate: ((gagnants / trades) * 100).toFixed(1),
+        gainMoyen: ((gainTotal + pertes) / trades * 100).toFixed(2),
+        gagnants
+      };
+
+  try { localStorage.setItem(CLE_BACKTEST, JSON.stringify({ cle: cleCacheBt, resultat })); } catch (e) {}
+  return resultat;
 }
 
 function afficherSignal(s) {
@@ -448,48 +558,55 @@ function afficherSignal(s) {
   const detail = document.getElementById('signal-detail');
   const conf = document.getElementById('signal-confiance');
   const risque = document.getElementById('risque');
-  
+  const raisonEl = document.getElementById('raison-signal');
+
   if (!s || !s.ok) {
     badge.textContent = '—'; badge.style.background = '#B5BCC3'; badge.style.color = '#2B3338';
-    expl.textContent = s && s.raison ? s.raison : 'Aucune donnée.'; detail.innerHTML = ''; conf.textContent = ''; risque.innerHTML = '';
+    expl.textContent = s && s.raison ? s.raison : 'Aucune donnée.';
+    detail.innerHTML = ''; conf.textContent = ''; risque.innerHTML = ''; raisonEl.innerHTML = '';
     return;
   }
-  const couleurs = { 'fort-achat': ['#1E8449', '#FFFFFF'], 'achat': ['#7DBB92', '#0F2B18'], 'attendre': ['#B5BCC3', '#2B3338'], 'vente': ['#E8A29A', '#4A0E0A'], 'fort-vente': ['#C0392B', '#FFFFFF'] };
+
+  const couleurs = {
+    'fort-achat': ['#1E8449', '#FFFFFF'],
+    'achat': ['#7DBB92', '#0F2B18'],
+    'attendre': ['#B5BCC3', '#2B3338'],
+    'vente': ['#E8A29A', '#4A0E0A'],
+    'fort-vente': ['#C0392B', '#FFFFFF']
+  };
   const pair = couleurs[s.couleur] || couleurs['attendre'];
   badge.textContent = s.signal;
   badge.style.background = pair[0]; badge.style.color = pair[1];
   expl.textContent = 'Score global : ' + (s.score > 0 ? '+' : '') + s.score + '.';
   conf.textContent = 'Confiance : ' + s.confiance;
-  
-  // Explication dynamique et pédagogique
-  const raisonEl = document.getElementById('raison-signal');
-  let raisonTexte = "";
+
+  let raisonTexte = '';
   if (s.signal === 'ACHAT FORT') {
-      raisonTexte = "🚀 <b>Pourquoi ?</b> La tendance de fond est haussière et le momentum est excellent. C'est le moment idéal pour entrer.";
+    raisonTexte = '🚀 <b>Pourquoi ?</b> Tendance de fond haussière + momentum aligné. Bon point d’entrée statistique.';
   } else if (s.signal === 'ACHAT MODÉRÉ') {
-      raisonTexte = "⚖️ <b>Pourquoi ?</b> La tendance globale est bonne, mais il y a une petite hésitation à court terme (souvent un indicateur négatif). C'est un bon point d'entrée, mais attends peut-être un mini-repli.";
+    raisonTexte = '⚖️ <b>Pourquoi ?</b> Tendance globalement positive mais signaux mixtes à court terme. Entrée possible avec stop serré.';
   } else if (s.signal === 'ATTENDRE' && s.confiance === 'Bloqué') {
-      raisonTexte = "🛑 <b>Pourquoi ?</b> L'action est dans une tendance baissière de fond. L'algorithme bloque l'achat pour te protéger (on n'attrape pas un couteau qui tombe).";
+    raisonTexte = '🛑 <b>Pourquoi ?</b> Tendance de fond baissière. L’algo refuse d’acheter pour éviter d’attraper un couteau qui tombe.';
   } else if (s.signal === 'ATTENDRE') {
-      raisonTexte = "✋ <b>Pourquoi ?</b> Les indicateurs se contredisent (ex: tendance bonne mais momentum mauvais) ou sont neutres. Il vaut mieux rester en dehors du marché.";
+    raisonTexte = '✋ <b>Pourquoi ?</b> Indicateurs contradictoires ou neutres. Mieux vaut rester à l’écart.';
   } else if (s.signal === 'VENTE FORTE') {
-      raisonTexte = "📉 <b>Pourquoi ?</b> La tendance s'est retournée à la baisse et les indicateurs confirment. C'est le moment de sécuriser tes gains ou de couper tes pertes.";
+    raisonTexte = '📉 <b>Pourquoi ?</b> Tendance baissière confirmée. Sécuriser les gains ou couper les pertes.';
   } else if (s.signal.includes('VENTE')) {
-      raisonTexte = "⚠️ <b>Pourquoi ?</b> Les signaux à court terme sont mauvais. L'action perd de sa force. La prudence est de mise.";
+    raisonTexte = '⚠️ <b>Pourquoi ?</b> Momentum et signaux courts se dégradent. Prudence.';
   }
   raisonEl.innerHTML = raisonTexte;
 
-  // Aide pour lire les détails
-  let aideDetail = '<div style="font-size:.75rem; color:#6B7785; margin-top:8px; margin-bottom:8px; font-style:italic; text-align:center">Les points (+) tirent le signal vers le haut (achat) et les points (-) vers le bas (vente).</div>';
-  
   if (s.stopLoss && s.takeProfit) {
-    risque.innerHTML = '<b>Gestion du Risque (Ratio ' + s.ratioRR + ')</b>'
-      + '🛑 <b>Stop-Loss : ' + formaterNombre(s.stopLoss) + ' $</b><br>'
-      + '🎯 <b>Take-Profit : ' + formaterNombre(s.takeProfit) + ' $</b>';
+    risque.innerHTML = '<div class="risque-box"><b>Gestion du Risque (Ratio ' + s.ratioRR + ')</b>'
+      + '🛑 Stop-Loss : <b>' + formaterNombre(s.stopLoss) + ' $</b><br>'
+      + '🎯 Take-Profit : <b>' + formaterNombre(s.takeProfit) + ' $</b></div>';
     risque.style.display = 'block';
-  } else { risque.style.display = 'none'; }
+  } else {
+    risque.style.display = 'none';
+  }
 
-  detail.innerHTML = aideDetail + s.details.map((d) => {
+  const aide = '<div style="font-size:.75rem;color:#6B7785;margin:8px 0;font-style:italic;text-align:center">Les points (+) poussent vers l’achat, les points (-) vers la vente.</div>';
+  detail.innerHTML = aide + s.details.map((d) => {
     const signe = d.pts > 0 ? '+' : '';
     const coul = d.pts > 0 ? 'var(--vert)' : (d.pts < 0 ? 'var(--rouge)' : '#6B7785');
     return '<div><span>' + d.nom + '</span><span style="color:#6B7785;font-size:.8rem;flex:1;text-align:right">' + d.valeur + '</span><span style="color:' + coul + ';font-weight:700;min-width:40px;text-align:right">' + signe + d.pts + '</span></div>';
@@ -506,7 +623,7 @@ function mettreAJourVL(jeuJournalier) {
     vlDate = new Date().toISOString().split('T')[0];
     localStorage.setItem('novartis.vlDate', vlDate);
   }
-  
+
   vlRefInput.value = vlRef;
   vlDateInput.value = vlDate;
 
@@ -521,15 +638,15 @@ function mettreAJourVL(jeuJournalier) {
   };
 
   if (!jeuJournalier || !jeuJournalier.points || !jeuJournalier.points.length) return;
-  
+
   const points = jeuJournalier.points;
   const dernierPoint = points[points.length - 1];
-  const coursActuel = dernierPoint.adjclose || dernierPoint.close;
+  const coursActuel = valeurPoint(dernierPoint);
 
   const targetTs = new Date(vlDate + 'T12:00:00Z').getTime() / 1000;
   let pointRef = points[0];
   let minDiff = Math.abs(points[0].timestamp - targetTs);
-  
+
   for (let i = 1; i < points.length; i++) {
     const diff = Math.abs(points[i].timestamp - targetTs);
     if (diff < minDiff) {
@@ -538,13 +655,14 @@ function mettreAJourVL(jeuJournalier) {
     }
   }
 
-  const coursRef = pointRef.adjclose || pointRef.close;
+  const coursRef = valeurPoint(pointRef);
+  if (!coursRef || !coursActuel) return;
+
   const variation = (coursActuel - coursRef) / coursRef;
   const vlActuelle = vlRef * (1 + variation);
-  
   const estVert = vlActuelle >= vlRef;
   const pourcentage = (variation * 100).toFixed(2);
-  
+
   document.getElementById('resultat_vl').innerHTML = 'Valeur actuelle estimée : <br>'
     + '<b style="font-size:1.4rem;color:' + (estVert ? 'var(--vert)' : 'var(--rouge)') + '">' + formaterNombre(vlActuelle) + ' €</b>'
     + '<br><span style="font-size:0.9rem;color:' + (estVert ? 'var(--vert)' : 'var(--rouge)') + '">'
@@ -573,7 +691,7 @@ async function chargerActus() {
 }
 function afficherActus(actus) {
   const el = document.getElementById('actus');
-  if (!actus.length) { el.innerHTML = '<div style="color:#6B7785">Aucune actu.</div>'; return; }
+  if (!actus || !actus.length) { el.innerHTML = '<div style="color:#6B7785">Aucune actu.</div>'; return; }
   el.innerHTML = actus.map((a) => {
     const score = analyserTitre(a.titre);
     const cls = score > 0 ? 'actu-pos' : (score < 0 ? 'actu-neg' : '');
@@ -591,25 +709,63 @@ document.getElementById('actus').addEventListener('click', (e) => {
 function dessinerGraphique(points) {
   const canvas = document.getElementById('graphique');
   const ctx = canvas.getContext('2d');
-  const largeur = canvas.width = canvas.clientWidth * (window.devicePixelRatio || 1);
-  const hauteur = canvas.height = canvas.clientHeight * (window.devicePixelRatio || 1);
+  const dpr = window.devicePixelRatio || 1;
+  const largeur = canvas.width = canvas.clientWidth * dpr;
+  const hauteur = canvas.height = canvas.clientHeight * dpr;
   ctx.clearRect(0, 0, largeur, hauteur);
-  if (!points.length) return;
-  const clotures = points.map((p) => valeurPoint(p)).filter((v) => v != null);
+  if (!points || points.length < 2) return;
+
+  const clotures = points.map(valeurPoint).filter((v) => v != null);
   const min = Math.min(...clotures), max = Math.max(...clotures);
-  const marge = (max - min) * 0.1 || 1;
+  const marge = (max - min) * 0.08 || 1;
   const x = (i) => (i / (points.length - 1 || 1)) * (largeur - 40) + 20;
   const y = (v) => hauteur - 20 - ((v - (min - marge)) / ((max + marge) - (min - marge))) * (hauteur - 40);
-  ctx.strokeStyle = '#0B5FA5'; ctx.lineWidth = 2 * (window.devicePixelRatio || 1);
+
+  // MM200
+  const mm200 = smaSerie(points, 200);
+  ctx.strokeStyle = '#8E44AD';
+  ctx.lineWidth = 1.5 * dpr;
+  ctx.beginPath();
+  let started = false;
+  for (let i = 0; i < points.length; i++) {
+    if (mm200[i] == null) continue;
+    if (!started) { ctx.moveTo(x(i), y(mm200[i])); started = true; }
+    else ctx.lineTo(x(i), y(mm200[i]));
+  }
+  ctx.stroke();
+
+  // MM50
+  const mm50 = smaSerie(points, 50);
+  ctx.strokeStyle = '#E67E22';
+  ctx.lineWidth = 1.5 * dpr;
+  ctx.beginPath();
+  started = false;
+  for (let i = 0; i < points.length; i++) {
+    if (mm50[i] == null) continue;
+    if (!started) { ctx.moveTo(x(i), y(mm50[i])); started = true; }
+    else ctx.lineTo(x(i), y(mm50[i]));
+  }
+  ctx.stroke();
+
+  // Prix
+  ctx.strokeStyle = '#0B5FA5';
+  ctx.lineWidth = 2.2 * dpr;
   ctx.beginPath();
   points.forEach((p, i) => {
-    const v = valeurPoint(p); if (v == null) return;
-    if (i === 0) ctx.moveTo(x(i), y(v)); else ctx.lineTo(x(i), y(v));
+    const v = valeurPoint(p);
+    if (v == null) return;
+    if (i === 0) ctx.moveTo(x(i), y(v));
+    else ctx.lineTo(x(i), y(v));
   });
   ctx.stroke();
 }
+
 function afficherTableau(points, intervalle) {
-  document.getElementById('tableau').innerHTML = points.map((p) => `<tr><td>${formaterDate(p.timestamp, intervalle)}</td><td>${formaterNombre(p.open)}</td><td>${formaterNombre(p.high)}</td><td>${formaterNombre(p.low)}</td><td>${formaterNombre(p.close)}</td><td>${formaterNombre(p.adjclose)}</td><td>${formaterNombre(p.volume)}</td></tr>`).join('');
+  // Limite à 80 derniers points pour la fluidité
+  const affiches = points.slice(-80);
+  document.getElementById('tableau').innerHTML = affiches.map((p) =>
+    `<tr><td>${formaterDate(p.timestamp, intervalle)}</td><td>${formaterNombre(p.open)}</td><td>${formaterNombre(p.high)}</td><td>${formaterNombre(p.low)}</td><td>${formaterNombre(p.close)}</td><td>${formaterNombre(p.adjclose)}</td><td>${formaterNombre(p.volume)}</td></tr>`
+  ).join('');
 }
 
 function afficher(erreurMsg) {
@@ -617,35 +773,40 @@ function afficher(erreurMsg) {
   const periode = document.getElementById('periode').value;
   const j1 = etat.jeux['1d'];
   const j2 = etat.jeux['1h'];
-  
+
   mettreAJourVL(j1);
 
   if (!j1 || !j1.points || !j1.points.length) {
-    document.getElementById('message').textContent = erreurMsg || 'Aucune donnée. Actualise.';
-    afficherSignal(null); afficherActus([]);
+    document.getElementById('message').textContent = erreurMsg || 'Aucune donnée. Clique sur « Tout actualiser ».';
+    afficherSignal(null);
+    afficherActus([]);
     document.getElementById('backtest').textContent = '—';
     return;
   }
-  const jeu = intervalle === '1h' && j2 ? j2 : j1;
+
+  const jeu = (intervalle === '1h' && j2 && j2.points && j2.points.length) ? j2 : j1;
   const points = filtrerPoints(jeu.points, periode, Date.now());
-  document.getElementById('message').textContent = points.length + ' points affichés / ' + jeu.points.length + ' enregistrés.';
-  
+  document.getElementById('message').textContent = points.length + ' points affichés / ' + jeu.points.length + ' en cache.';
+
   dessinerGraphique(points);
   afficherTableau(points, intervalle);
   afficherActus(etat.actus);
-  
-  const s = calculerSignal(j1.points, j2 ? j2.points : j1.points, etat.actus);
+
+  const s = calculerSignal(j1.points, j2 ? j2.points : null, etat.actus);
   afficherSignal(s);
-  
-  const bt = lancerBacktest(j1.points, j1.points);
+
+  // Backtest (journalier uniquement pour stabilité et performance)
+  const bt = lancerBacktest(j1.points);
   if (bt && bt.trades > 0) {
-    document.getElementById('backtest').innerHTML = 'Sur les 5 dernières années, ce signal a généré <b>' + bt.trades + ' achats</b>.<br>'
-      + '✅ Taux de réussite : <b>' + bt.winRate + '%</b><br>'
-      + '📈 Gain moyen : +' + bt.gainMoyen + '%';
+    document.getElementById('backtest').innerHTML =
+      'Sur l’historique disponible : <b>' + bt.trades + ' signaux d’achat</b><br>'
+      + '✅ Taux de réussite : <b>' + bt.winRate + '%</b> (' + bt.gagnants + ' gagnants)<br>'
+      + '📈 Performance moyenne : <b>' + (bt.gainMoyen >= 0 ? '+' : '') + bt.gainMoyen + '%</b> (horizon max 20 j + SL/TP)';
   } else {
-    document.getElementById('backtest').textContent = 'Pas assez de données.';
+    document.getElementById('backtest').textContent = bt && bt.msg ? bt.msg : 'Pas assez de données pour le backtest.';
   }
 
+  // Notification uniquement sur changement de signal Haute confiance
   const ancienSignal = localStorage.getItem('novartis.dernierSignal');
   if (ancienSignal !== s.signal && s.confiance === 'Haute') {
     if (window.Android && Android.notifier) Android.notifier('Novartis : ' + s.signal, s.explication);
@@ -654,15 +815,14 @@ function afficher(erreurMsg) {
 }
 
 async function telechargerJeu(jeu) {
-  // L'appli lit le fichier JSON stocké sur GitHub (mis à jour par le workflow)
   const url = URL_BASE_GITHUB + 'cours_' + jeu.cle + '.json';
   const texte = await lire(url);
   if (!texte || texte.trim() === '') throw new Error('Fichier GitHub vide.');
-  
+
   let data;
   try { data = JSON.parse(texte); } catch (e) { throw new Error('JSON invalide.'); }
   if (!data.chart || !data.chart.result || !data.chart.result[0]) throw new Error('Données introuvables.');
-  
+
   const r = data.chart.result[0];
   const timestamps = r.timestamp || [];
   const q = r.indicators.quote[0] || {};
@@ -670,14 +830,14 @@ async function telechargerJeu(jeu) {
   const points = [];
   for (let i = 0; i < timestamps.length; i++) {
     if (q.close[i] == null) continue;
-    points.push({ 
-      timestamp: timestamps[i], 
-      open: q.open ? q.open[i] : q.close[i], 
-      high: q.high ? q.high[i] : q.close[i], 
-      low: q.low ? q.low[i] : q.close[i], 
-      close: q.close[i], 
+    points.push({
+      timestamp: timestamps[i],
+      open: q.open ? q.open[i] : q.close[i],
+      high: q.high ? q.high[i] : q.close[i],
+      low: q.low ? q.low[i] : q.close[i],
+      close: q.close[i],
       adjclose: adj.adjclose ? adj.adjclose[i] : q.close[i],
-      volume: q.volume ? q.volume[i] : 0 
+      volume: q.volume ? q.volume[i] : 0
     });
   }
   return { points, devise: 'USD' };
@@ -710,9 +870,12 @@ async function toutActualiser() {
     erreurs.push('Actualités : ' + e.message);
   }
 
+  // Invalider le cache backtest
+  try { localStorage.removeItem(CLE_BACKTEST); } catch (e) {}
+
   bouton.disabled = false;
   document.getElementById('progression').textContent = '';
-  
+
   if (erreurs.length > 0) {
     afficher('❌ Erreur(s) : ' + erreurs.join(' | '));
   } else {
@@ -721,14 +884,15 @@ async function toutActualiser() {
 }
 
 document.getElementById('vider').onclick = () => {
-  if (confirm("Voulez-vous vraiment effacer toutes les données sauvegardées et repartir à zéro ?")) {
+  if (confirm('Effacer toutes les données sauvegardées et repartir à zéro ?')) {
     localStorage.clear();
     etat.jeux = {};
     etat.actus = [];
+    etat.backtestCache = null;
     document.getElementById('vl_ref').value = '';
     document.getElementById('vl_date').value = '';
     document.getElementById('resultat_vl').innerHTML = 'Valeur actuelle estimée : <br><b style="font-size:1.4rem;color:var(--prim)">— €</b>';
-    document.getElementById('message').textContent = '✅ Cache vidé. Clique sur "Tout actualiser" pour recharger.';
+    document.getElementById('message').textContent = '✅ Cache vidé. Clique sur « Tout actualiser ».';
     document.getElementById('progression').textContent = '';
     document.getElementById('backtest').textContent = '—';
     document.getElementById('actus').innerHTML = '';
@@ -747,19 +911,21 @@ caseAuto.addEventListener('change', () => {
   if (window.Android && Android.activerServiceFond) Android.activerServiceFond(caseAuto.checked);
 });
 
+// Chargement initial depuis le cache
 for (const jeu of JEUX) {
   const cache = lireCache(jeu.cle);
   if (cache) etat.jeux[jeu.cle] = cache;
 }
 try {
   const cacheActus = localStorage.getItem(CLE_ACTUS);
-  if (cacheActus) etat.actus = JSON.parse(cacheActus).actus;
-} catch (e) { }
+  if (cacheActus) etat.actus = JSON.parse(cacheActus).actus || [];
+} catch (e) {}
 
 afficher();
 if (caseAuto.checked && window.Android && Android.activerServiceFond) Android.activerServiceFond(true);
 if (JEUX.every((j) => !etat.jeux[j.cle])) toutActualiser();
 
+// ===== CONTRÔLE QUALITÉ — NE JAMAIS MODIFIER UN CAS POUR LE FAIRE PASSER =====
 const normaliserEspaces = (s) => String(s).replace(/[\u202f\u00a0\u2009]/g, ' ');
 function controleQualite() {
   const cas = [
@@ -768,18 +934,25 @@ function controleQualite() {
     ['RSI décroissant = 0', () => rsi(Array.from({ length: 20 }, (_, i) => ({ close: 200 - i })), 14), 0],
     ['Analyse « approval » → +1', () => analyserTitre('approval'), 1],
     ['Analyse « lawsuit » → -1', () => analyserTitre('lawsuit'), -1],
+    ['SMA 3 points simples', () => sma([{close:10},{close:20},{close:30}], 3), 20],
   ];
   const ko = [];
   for (const [nom, f, attendu] of cas) {
-    let obtenu; try { obtenu = f(); } catch (e) { obtenu = 'plantage'; }
-    const ok = typeof attendu === 'number' ? (typeof obtenu === 'number' && Math.abs(obtenu - attendu) < 0.01) : String(obtenu) === String(attendu);
+    let obtenu;
+    try { obtenu = f(); } catch (e) { obtenu = 'plantage : ' + e.message; }
+    const ok = typeof attendu === 'number'
+      ? (typeof obtenu === 'number' && Math.abs(obtenu - attendu) < 0.01)
+      : String(obtenu) === String(attendu);
     if (!ok) ko.push(nom + ' : attendu ' + JSON.stringify(attendu) + ', obtenu ' + JSON.stringify(obtenu));
   }
   const el = document.getElementById('controle');
-  if (el) el.textContent = ko.length ? '❌ ' + ko.length + ' contrôle(s) en échec : ' + ko.join(' ; ') : '✅ Tout est conforme';
-  for (const k of ko) console.error('Contrôle qualité — ' + k);
+  if (el) el.textContent = ko.length
+    ? '❌ ' + ko.length + ' contrôle(s) sur ' + cas.length + ' en échec : ' + ko.join(' ; ')
+    : '✅ Tout est conforme (' + cas.length + '/' + cas.length + ')';
+  for (const k of ko) console.error('Contrôle qualité en échec — ' + k);
 }
 controleQualite();
+// ===== FIN DU CONTRÔLE QUALITÉ =====
 </script>
 </body>
 </html>
