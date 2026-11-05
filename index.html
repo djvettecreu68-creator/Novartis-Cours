@@ -26,11 +26,20 @@ th{color:#6B7785;font-weight:600;font-size:.8rem}
 #message{font-size:.88rem;color:#6B7785;margin-top:8px;min-height:1.2em}
 #progression{font-size:.85rem;color:var(--prim);margin-top:6px}
 #controle{font-size:.78rem;color:#6B7785;padding:10px 2px;text-align:center}
+#signal-badge{font-size:1.6rem;font-weight:800;text-align:center;padding:22px;border-radius:16px;margin-bottom:12px;letter-spacing:.02em}
+#signal-detail>div{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid var(--bord);font-size:.85rem}
+#signal-detail>div:last-child{border-bottom:0}
+#actus>div{padding:9px 0;border-bottom:1px solid var(--bord);cursor:pointer}
+#actus>div:last-child{border-bottom:0}
+#actus .actu-titre{font-weight:600;font-size:.9rem;line-height:1.3}
+#actus .actu-meta{color:#6B7785;font-size:.75rem;margin-top:3px}
+#actus .actu-pos{color:var(--vert);font-weight:700}
+#actus .actu-neg{color:var(--rouge);font-weight:700}
 </style>
 </head>
 <body>
 <h1>Novartis Cours</h1>
-<div class="sous">Précision maximale — Yahoo Finance (NVS)</div>
+<div class="sous">Cours (Yahoo Finance NVS) + actualité (Google News) — aucun serveur intermédiaire</div>
 
 <div class="carte">
   <div class="ligne">
@@ -57,15 +66,32 @@ th{color:#6B7785;font-weight:600;font-size:.8rem}
     <input type="checkbox" id="horsligne" style="width:22px;height:22px">
     <label for="horsligne">Mode hors-ligne : aucune requête, relit seulement les données sauvegardées</label>
   </div>
+  <div class="ligne" style="margin-top:6px">
+    <input type="checkbox" id="auto" style="width:22px;height:22px">
+    <label for="auto">Automatique : actualisation toutes les 30 min + notifications achat/vente</label>
+  </div>
   <div class="ligne" style="margin-top:10px">
-    <button id="charger" style="flex:1">Tout actualiser (6 requêtes)</button>
+    <button id="charger" style="flex:1">Tout actualiser</button>
   </div>
   <div id="message"></div>
   <div id="progression"></div>
 </div>
 
 <div class="carte">
+  <div style="font-size:1.1rem;font-weight:700;margin-bottom:12px">Signal d'aide à la décision</div>
+  <div id="signal-badge">—</div>
+  <div id="signal-explication" style="font-size:.88rem;color:#6B7785;margin-bottom:12px;text-align:center"></div>
+  <div id="signal-detail"></div>
+  <div style="font-size:.72rem;color:#8B959E;margin-top:12px;line-height:1.4">⚠️ Aide à la lecture technique + actualité, pas un conseil financier. Aucun système ne prédit l'avenir.</div>
+</div>
+
+<div class="carte">
   <canvas id="graphique"></canvas>
+</div>
+
+<div class="carte">
+  <div style="font-size:1.1rem;font-weight:700;margin-bottom:8px">Actualité récente</div>
+  <div id="actus"></div>
 </div>
 
 <div class="carte" style="overflow-x:auto">
@@ -124,23 +150,6 @@ th{color:#6B7785;font-weight:600;font-size:.8rem}
     const c = e.target; if (!c || !c.tagName || c.closest('#__signal')) return;
     noter('change ' + c.tagName.toLowerCase() + (c.id ? ' #' + c.id : '') + (c.type === 'password' ? '' : ' = « ' + String(c.type === 'checkbox' ? c.checked : c.value).slice(0, 30) + ' »'));
   }, true);
-  if (window.fetch) {
-    const fetchAvant = window.fetch;
-    window.fetch = async (...a) => {
-      const u = String((a[0] && a[0].url) || a[0]).slice(0, 120), m = ((a[1] && a[1].method) || 'GET').toUpperCase();
-      try {
-        const r = await fetchAvant(...a);
-        noter('appel ' + m + ' ' + u + ' → ' + r.status);
-        if (r.status >= 400) r.clone().text().then((t) => envoyer(r.status >= 500 ? 'serveur' : 'reseau',
-          (r.status >= 500 ? 'Le serveur a répondu ' : 'Réponse ') + r.status + ' à ' + m + ' ' + u, 0, 0, '', { reponse: couper(t, 800) })).catch(() => { });
-        return r;
-      } catch (err) {
-        noter('appel ' + m + ' ' + u + ' → échec réseau (' + err.message + ')');
-        envoyer('reseau', 'Échec réseau sur ' + m + ' ' + u + ' : ' + err.message, 0, 0, '');
-        throw err;
-      }
-    };
-  }
   window.addEventListener('error', (e) => envoyer('ecran', e.message || 'Erreur', e.lineno, e.colno, e.error && e.error.stack));
   window.addEventListener('unhandledrejection', (e) => { const r = e.reason; envoyer('ecran', 'Promesse rejetée : ' + ((r && r.message) || r), 0, 0, r && r.stack); });
   const consoleErreur = console.error;
@@ -155,7 +164,7 @@ th{color:#6B7785;font-weight:600;font-size:.8rem}
     d.innerHTML = '<div style="background:#fff;color:#111;width:100%;max-width:560px;border-radius:20px 20px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:12px">'
       + '<b style="font-size:1.15rem">🐞 Signaler un problème</b>'
       + '<span style="color:#555;font-size:.9rem">Dis en une phrase ce qui ne va pas. L’écran, tes derniers gestes et les données partent avec, pour l’IA.</span>'
-      + '<textarea id="__signalTexte" rows="3" style="font:inherit;color:#111;background:#fff;border:1px solid #bbb;border-radius:12px;padding:10px" placeholder="Ex. : le graphique est vide ou les dates sont fausses"></textarea>'
+      + '<textarea id="__signalTexte" rows="3" style="font:inherit;color:#111;background:#fff;border:1px solid #bbb;border-radius:12px;padding:10px" placeholder="Ex. : le signal ne change jamais ou les news ne s’affichent pas"></textarea>'
       + '<div style="display:flex;gap:10px"><button id="__signalNon" style="flex:1;height:46px;border:0;border-radius:23px;background:#e6e6e6;color:#111;font:inherit;font-weight:700">Annuler</button>'
       + '<button id="__signalOui" style="flex:2;height:46px;border:0;border-radius:23px;background:#D2463A;color:#fff;font:inherit;font-weight:700">Envoyer</button></div></div>';
     document.body.appendChild(d);
@@ -179,15 +188,36 @@ th{color:#6B7785;font-weight:600;font-size:.8rem}
   noter('ouverture de l’appli');
 })();
 
-// ===== APPLICATION NOVARTIS =====
-const WORKER = 'https://novartis-cours.djvettecreu68.workers.dev';
-const canvas = document.getElementById('graphique');
-const ctx = canvas.getContext('2d');
-const tableau = document.getElementById('tableau');
-const message = document.getElementById('message');
-const progression = document.getElementById('progression');
+// ===== HTTP DIRECT (Java en priorité, pas de Worker) =====
+const requetesEnCours = {};
+window.__reponse = (data) => {
+  const p = requetesEnCours[data.id];
+  if (!p) return;
+  delete requetesEnCours[data.id];
+  if (data.statut >= 200 && data.statut < 400) p.resolve(data.corps);
+  else p.reject(new Error('HTTP ' + data.statut + (data.corps ? ' — ' + String(data.corps).slice(0, 160) : '')));
+};
+function lire(url) {
+  return new Promise((resolve, reject) => {
+    if (window.Android && Android.lireTexte) {
+      const id = 'r' + Math.random().toString(36).slice(2);
+      requetesEnCours[id] = { resolve, reject };
+      try { Android.lireTexte(url, id); }
+      catch (e) { delete requetesEnCours[id]; reject(e); return; }
+      setTimeout(() => { if (requetesEnCours[id]) { delete requetesEnCours[id]; reject(new Error('Délai dépassé (30 s)')); } }, 30000);
+    } else if (window.fetch) {
+      fetch(url).then(async (r) => {
+        const corps = await r.text();
+        if (r.status >= 400) reject(new Error('HTTP ' + r.status));
+        else resolve(corps);
+      }).catch(reject);
+    } else {
+      reject(new Error('Pas de moyen de télécharger'));
+    }
+  });
+}
 
-// 6 jeux de données : chacun a sa clé, sa fenêtre max et son libellé
+// ===== URLS YAHOO (aucun Worker, appel direct) =====
 const JEUX = [
   { cle: '1d',  interval: '1d',  range: 'max',  libelle: 'Journalier (tout)' },
   { cle: '1h',  interval: '1h',  range: '2y',   libelle: 'Horaire (2 ans)' },
@@ -196,16 +226,22 @@ const JEUX = [
   { cle: '5m',  interval: '5m',  range: '3mo',  libelle: '5 minutes (60 j)' },
   { cle: '1m',  interval: '1m',  range: '1mo',  libelle: '1 minute (7 j)' },
 ];
+function urlCours(jeu) {
+  return 'https://query1.finance.yahoo.com/v8/finance/chart/NVS?range=' + jeu.range + '&interval=' + jeu.interval + '&includePrePost=false&events=div%2Csplits';
+}
+const URL_NEWS_FR = 'https://news.google.com/rss/search?q=Novartis+when:7d&hl=fr&gl=FR&ceid=FR:fr';
+const URL_NEWS_EN = 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=NVS&region=US&lang=en-US';
+
 const PREFIXE_CACHE = 'novartis.v2.';
 const CLE_HORS_LIGNE = 'novartis.horsligne';
+const CLE_AUTO = 'novartis.auto';
+const CLE_DERNIER_SIGNAL = 'novartis.dernierSignal';
+const CLE_DERNIER_NEGATIF = 'novartis.dernierNegatif';
+const CLE_ACTUS = 'novartis.actus';
 
-const etat = {
-  intervalle: '1d',
-  jeux: {},        // cle → { points, devise, dateMax }
-};
+const etat = { intervalle: '1d', jeux: {}, actus: [] };
 
 function cleCache(cle) { return PREFIXE_CACHE + cle; }
-
 function lireCache(cle) {
   try {
     const brut = localStorage.getItem(cleCache(cle));
@@ -215,7 +251,6 @@ function lireCache(cle) {
     return data;
   } catch (e) { return null; }
 }
-
 function ecrireCache(cle, data) {
   try {
     localStorage.setItem(cleCache(cle), JSON.stringify({ devise: data.devise || 'USD', dateMax: Date.now(), points: data.points }));
@@ -225,8 +260,6 @@ function ecrireCache(cle, data) {
     return false;
   }
 }
-
-// filtre purement local, aucune requête
 function filtrerPoints(points, periode, maintenantMs) {
   if (!points || !points.length) return [];
   if (periode === 'max') return points.slice();
@@ -238,32 +271,241 @@ function filtrerPoints(points, periode, maintenantMs) {
   const seuil = Math.floor(d.getTime() / 1000);
   return points.filter((p) => p.timestamp >= seuil);
 }
-
 function formaterNombre(v) {
   if (v == null || isNaN(v)) return '—';
   return Number(v).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
-
 function formaterVolume(v) {
   if (v == null || isNaN(v)) return '—';
   return Number(v).toLocaleString('fr-FR');
 }
-
 function formaterDate(ts, intervalle) {
   const d = new Date(ts * 1000);
-  if (intervalle === '1d' || intervalle === '1wk' || intervalle === '1mo') {
-    return d.toLocaleDateString('fr-FR');
-  }
+  if (intervalle === '1d' || intervalle === '1wk' || intervalle === '1mo') return d.toLocaleDateString('fr-FR');
   return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' })
     + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 }
 
+// ===== INDICATEURS TECHNIQUES =====
+function valeurPoint(p) { return p.adjclose != null ? p.adjclose : p.close; }
+function sma(points, n) {
+  if (!points || points.length < n) return null;
+  let somme = 0;
+  for (let i = points.length - n; i < points.length; i++) somme += valeurPoint(points[i]);
+  return somme / n;
+}
+function ema(points, n) {
+  const k = 2 / (n + 1);
+  const out = [];
+  let prev = null;
+  for (let i = 0; i < points.length; i++) {
+    const v = valeurPoint(points[i]);
+    if (i === 0) { prev = v; out.push(v); }
+    else { prev = v * k + prev * (1 - k); out.push(prev); }
+  }
+  return out;
+}
+function rsi(points, n) {
+  n = n || 14;
+  if (!points || points.length < n + 1) return null;
+  let gains = 0, pertes = 0;
+  for (let i = 1; i <= n; i++) {
+    const d = valeurPoint(points[i]) - valeurPoint(points[i - 1]);
+    if (d > 0) gains += d; else pertes += -d;
+  }
+  let moyGain = gains / n, moyPerte = pertes / n;
+  for (let i = n + 1; i < points.length; i++) {
+    const d = valeurPoint(points[i]) - valeurPoint(points[i - 1]);
+    const g = d > 0 ? d : 0, p = d < 0 ? -d : 0;
+    moyGain = (moyGain * (n - 1) + g) / n;
+    moyPerte = (moyPerte * (n - 1) + p) / n;
+  }
+  if (moyPerte === 0) return moyGain === 0 ? 50 : 100;
+  const rs = moyGain / moyPerte;
+  return 100 - 100 / (1 + rs);
+}
+function macd(points) {
+  if (!points || points.length < 35) return null;
+  const e12 = ema(points, 12), e26 = ema(points, 26);
+  const ligne = e12.map((v, i) => v - e26[i]);
+  const ligneTronq = ligne.slice(25);
+  const faussPts = ligneTronq.map((v) => ({ close: v, adjclose: null }));
+  const sig = ema(faussPts, 9);
+  return { ligne: ligne[ligne.length - 1], signal: sig[sig.length - 1], histogramme: ligne[ligne.length - 1] - sig[sig.length - 1] };
+}
+function bollinger(points, n, mult) {
+  n = n || 20; mult = mult || 2;
+  if (!points || points.length < n) return null;
+  const fenetre = points.slice(-n).map(valeurPoint);
+  const moyenne = fenetre.reduce((a, b) => a + b, 0) / n;
+  const variance = fenetre.reduce((a, v) => a + (v - moyenne) * (v - moyenne), 0) / n;
+  const ecart = Math.sqrt(variance);
+  return { moyenne: moyenne, haute: moyenne + mult * ecart, basse: moyenne - mult * ecart };
+}
+function calculerTechnique(points) {
+  if (!points || points.length < 200) {
+    return { ok: false, raison: 'Il faut au moins 200 points pour calculer les indicateurs (il y en a ' + (points ? points.length : 0) + ').' };
+  }
+  const close = valeurPoint(points[points.length - 1]);
+  const details = [];
+  let score = 0;
+  const mm50 = sma(points, 50), mm200 = sma(points, 200);
+  let ptsTendance = mm50 > mm200 ? 30 : (mm50 < mm200 ? -30 : 0);
+  score += ptsTendance;
+  details.push({ nom: 'MM50 vs MM200', valeur: 'MM50 ' + mm50.toFixed(2) + ' / MM200 ' + mm200.toFixed(2), pts: ptsTendance });
+  const mm20 = sma(points, 20);
+  let ptsMomentum = mm20 > mm50 ? 15 : (mm20 < mm50 ? -15 : 0);
+  score += ptsMomentum;
+  details.push({ nom: 'MM20 vs MM50', valeur: 'MM20 ' + mm20.toFixed(2) + ' / MM50 ' + mm50.toFixed(2), pts: ptsMomentum });
+  const r = rsi(points, 14);
+  let ptsRSI = 0;
+  if (r != null) ptsRSI = r <= 30 ? 25 : (r >= 70 ? -25 : Math.max(-25, Math.min(25, Math.round((50 - r) / 2))));
+  score += ptsRSI;
+  details.push({ nom: 'RSI 14', valeur: r == null ? '—' : r.toFixed(1) + (r <= 30 ? ' (survendu)' : r >= 70 ? ' (suracheté)' : ''), pts: ptsRSI });
+  const m = macd(points);
+  const ptsMACD = m ? (m.histogramme > 0 ? 15 : -15) : 0;
+  score += ptsMACD;
+  details.push({ nom: 'MACD', valeur: m ? 'histogramme ' + m.histogramme.toFixed(3) : '—', pts: ptsMACD });
+  const b = bollinger(points, 20, 2);
+  let ptsBoll = 0, bollTexte = '—';
+  if (b) {
+    if (close < b.basse) { ptsBoll = 20; bollTexte = 'sous bande basse (' + b.basse.toFixed(2) + ')'; }
+    else if (close > b.haute) { ptsBoll = -20; bollTexte = 'sur bande haute (' + b.haute.toFixed(2) + ')'; }
+    else bollTexte = 'dans [' + b.basse.toFixed(2) + ' ; ' + b.haute.toFixed(2) + ']';
+  }
+  score += ptsBoll;
+  details.push({ nom: 'Bollinger', valeur: bollTexte, pts: ptsBoll });
+  return { ok: true, score: score, details: details, close: close };
+}
+
+// ===== ACTUALITÉS =====
+const MOTS_POSITIFS = ['beat', 'beats', 'raise', 'raises', 'raised', 'approval', 'approved', 'success', 'positive', 'growth', 'upgrade', 'upgraded', 'profit', 'breakthrough', 'record', 'accord', 'approuv', 'hausse', 'bénéfice', 'succès', 'positif', 'progression'];
+const MOTS_NEGATIFS = ['miss', 'misses', 'downgrade', 'downgraded', 'lawsuit', 'fail', 'failed', 'failure', 'recall', 'warning', 'loss', 'drop', 'plunge', 'fall', 'decline', 'reject', 'rejected', 'investigation', 'procès', 'échec', 'chute', 'baisse', 'perte', 'avertissement', 'rappel', 'enquête'];
+function analyserTitre(titre) {
+  const t = String(titre || '').toLowerCase();
+  let s = 0;
+  for (const m of MOTS_POSITIFS) if (t.includes(m)) s++;
+  for (const m of MOTS_NEGATIFS) if (t.includes(m)) s--;
+  return s;
+}
+function parserRSS(xml) {
+  try {
+    const doc = new DOMParser().parseFromString(xml, 'application/xml');
+    const items = [...doc.querySelectorAll('item')].slice(0, 10);
+    return items.map((item) => ({
+      titre: (item.querySelector('title')?.textContent || '').trim(),
+      lien: (item.querySelector('link')?.textContent || '').trim(),
+      date: (item.querySelector('pubDate')?.textContent || '').trim(),
+      source: (item.querySelector('source')?.textContent || '').trim()
+    })).filter((a) => a.titre);
+  } catch (e) { return []; }
+}
+async function chargerActus() {
+  const textes = await Promise.all([
+    lire(URL_NEWS_FR).catch((e) => { console.error('News FR : ' + e.message); return ''; }),
+    lire(URL_NEWS_EN).catch((e) => { console.error('News EN : ' + e.message); return ''; })
+  ]);
+  const fr = parserRSS(textes[0]);
+  const en = parserRSS(textes[1]);
+  const tous = [...fr, ...en]
+    .map((a) => ({ ...a, score: analyserTitre(a.titre) }))
+    .filter((a, i, arr) => arr.findIndex((x) => x.titre === a.titre) === i)
+    .sort((a, b) => {
+      const da = Date.parse(a.date) || 0, db = Date.parse(b.date) || 0;
+      return db - da;
+    })
+    .slice(0, 15);
+  return tous;
+}
+function afficherActus(actus) {
+  const el = document.getElementById('actus');
+  if (!el) return;
+  if (!actus.length) {
+    el.innerHTML = '<div style="color:#6B7785">Aucune actualité chargée. Actualise avec le réseau.</div>';
+    return;
+  }
+  el.innerHTML = actus.map((a) => {
+    const cls = a.score > 0 ? 'actu-pos' : (a.score < 0 ? 'actu-neg' : '');
+    const signe = a.score > 0 ? '+' + a.score : (a.score < 0 ? String(a.score) : '');
+    const d = a.date ? new Date(a.date).toLocaleDateString('fr-FR') : '';
+    return '<div data-lien="' + (a.lien || '') + '"><div class="actu-titre">' + a.titre + '</div>'
+      + '<div class="actu-meta">' + [a.source, d].filter(Boolean).join(' · ')
+      + (signe ? ' <span class="' + cls + '">' + signe + '</span>' : '')
+      + '</div></div>';
+  }).join('');
+}
+document.getElementById('actus').addEventListener('click', (e) => {
+  const d = e.target.closest('[data-lien]');
+  if (!d || !d.dataset.lien) return;
+  if (window.Android && Android.ouvrirLien) Android.ouvrirLien(d.dataset.lien);
+  else window.open(d.dataset.lien, '_blank');
+});
+
+// ===== SIGNAL COMBINÉ =====
+function signalCombine(points, actus) {
+  const t = calculerTechnique(points);
+  if (!t.ok) return t;
+  let scoreNews = 0;
+  for (const a of actus) scoreNews += analyserTitre(a.titre);
+  const bonusNews = Math.max(-20, Math.min(20, scoreNews * 4));
+  const scoreFinal = Math.max(-105, Math.min(105, t.score + bonusNews));
+  let signal, couleur, explication;
+  if (scoreFinal >= 40) { signal = 'ACHAT FORT'; couleur = 'fort-achat'; explication = 'Indicateurs techniques et actualité convergents à la hausse.'; }
+  else if (scoreFinal >= 15) { signal = 'ACHAT MODÉRÉ'; couleur = 'achat'; explication = 'Signaux plutôt haussiers, sans conviction forte.'; }
+  else if (scoreFinal <= -40) { signal = 'VENTE FORTE'; couleur = 'fort-vente'; explication = 'Indicateurs techniques et actualité convergents à la baisse.'; }
+  else if (scoreFinal <= -15) { signal = 'VENTE MODÉRÉE'; couleur = 'vente'; explication = 'Signaux plutôt baissiers, sans conviction forte.'; }
+  else { signal = 'ATTENDRE'; couleur = 'attendre'; explication = 'Signaux contradictoires ou neutres. Pas de direction claire.'; }
+  return { ok: true, score: scoreFinal, signal, couleur, explication, details: t.details, bonusNews, close: t.close };
+}
+function afficherSignal(s) {
+  const badge = document.getElementById('signal-badge');
+  const expl = document.getElementById('signal-explication');
+  const detail = document.getElementById('signal-detail');
+  if (!badge || !expl || !detail) return;
+  if (!s || !s.ok) {
+    badge.textContent = '—'; badge.style.background = '#B5BCC3'; badge.style.color = '#2B3338';
+    expl.textContent = s && s.raison ? s.raison : 'Aucune donnée chargée.'; detail.innerHTML = '';
+    return;
+  }
+  const couleurs = { 'fort-achat': ['#1E8449', '#FFFFFF'], 'achat': ['#7DBB92', '#0F2B18'], 'attendre': ['#B5BCC3', '#2B3338'], 'vente': ['#E8A29A', '#4A0E0A'], 'fort-vente': ['#C0392B', '#FFFFFF'] };
+  const pair = couleurs[s.couleur] || couleurs['attendre'];
+  badge.textContent = s.signal;
+  badge.style.background = pair[0]; badge.style.color = pair[1];
+  expl.textContent = s.explication + ' Score : ' + (s.score > 0 ? '+' : '') + s.score + ' / ±105' + (s.bonusNews ? ' (bonus actus ' + (s.bonusNews > 0 ? '+' : '') + s.bonusNews + ')' : '') + '.';
+  detail.innerHTML = s.details.map((d) => {
+    const signe = d.pts > 0 ? '+' : '';
+    const coul = d.pts > 0 ? 'var(--vert)' : (d.pts < 0 ? 'var(--rouge)' : '#6B7785');
+    return '<div><span>' + d.nom + '</span><span style="color:#6B7785;font-size:.8rem;flex:1;text-align:right">' + d.valeur + '</span><span style="color:' + coul + ';font-weight:700;min-width:40px;text-align:right">' + signe + d.pts + '</span></div>';
+  }).join('');
+}
+
+// ===== NOTIFICATIONS =====
+function notifierSiChangement(s, actus) {
+  if (!s || !s.ok) return;
+  const dernier = localStorage.getItem(CLE_DERNIER_SIGNAL);
+  if (dernier !== s.signal) {
+    if (window.Android && Android.notifier) {
+      Android.notifier('Novartis : ' + s.signal, s.explication + ' (score ' + (s.score > 0 ? '+' : '') + s.score + ')');
+    }
+    try { localStorage.setItem(CLE_DERNIER_SIGNAL, s.signal); } catch (e) { }
+  }
+  const negatifs = actus.map((a) => ({ titre: a.titre, pts: analyserTitre(a.titre) })).filter((a) => a.pts <= -2);
+  if (negatifs.length) {
+    const dernierNeg = localStorage.getItem(CLE_DERNIER_NEGATIF);
+    if (dernierNeg !== negatifs[0].titre) {
+      if (window.Android && Android.notifier) Android.notifier('Novartis : actualité défavorable', negatifs[0].titre);
+      try { localStorage.setItem(CLE_DERNIER_NEGATIF, negatifs[0].titre); } catch (e) { }
+    }
+  }
+}
+
+// ===== AFFICHAGE GRAPHIQUE + TABLEAU =====
 function dessinerGraphique(points) {
   const largeur = canvas.width = canvas.clientWidth * (window.devicePixelRatio || 1);
   const hauteur = canvas.height = canvas.clientHeight * (window.devicePixelRatio || 1);
   ctx.clearRect(0, 0, largeur, hauteur);
   if (!points.length) return;
-  const clotures = points.map((p) => p.adjclose != null ? p.adjclose : p.close).filter((v) => v != null);
+  const clotures = points.map((p) => valeurPoint(p)).filter((v) => v != null);
   if (!clotures.length) return;
   const min = Math.min(...clotures), max = Math.max(...clotures);
   const marge = (max - min) * 0.1 || 1;
@@ -274,14 +516,13 @@ function dessinerGraphique(points) {
   ctx.lineWidth = 2 * (window.devicePixelRatio || 1);
   ctx.beginPath();
   points.forEach((p, i) => {
-    const v = p.adjclose != null ? p.adjclose : p.close;
+    const v = valeurPoint(p);
     if (v == null) return;
-    if (i === 0 || (points[i - 1].adjclose == null && points[i - 1].close == null)) ctx.moveTo(x(i), y(v));
+    if (i === 0) ctx.moveTo(x(i), y(v));
     else ctx.lineTo(x(i), y(v));
   });
   ctx.stroke();
 }
-
 function afficherTableau(points, intervalle) {
   tableau.innerHTML = points.map((p) => {
     const date = formaterDate(p.timestamp, intervalle);
@@ -289,34 +530,63 @@ function afficherTableau(points, intervalle) {
   }).join('');
 }
 
+// ===== CHARGEMENT + BOUCLE =====
+const canvas = document.getElementById('graphique');
+const ctx = canvas.getContext('2d');
+const tableau = document.getElementById('tableau');
+const message = document.getElementById('message');
+const progression = document.getElementById('progression');
+
 function afficher() {
   const intervalle = document.getElementById('intervalle').value;
   const periode = document.getElementById('periode').value;
   const jeu = etat.jeux[intervalle];
   tableau.innerHTML = '';
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const points = jeu ? filtrerPoints(jeu.points, periode, Date.now()) : [];
   if (!jeu || !jeu.points || !jeu.points.length) {
     message.textContent = 'Aucune donnée pour « ' + intervalle + ' ». Appuie sur « Tout actualiser » avec le réseau.';
-    return;
-  }
-  const points = filtrerPoints(jeu.points, periode, Date.now());
-  if (!points.length) {
+  } else if (!points.length) {
     message.textContent = 'Aucun point dans cette période pour « ' + intervalle + ' ».';
-    return;
+  } else {
+    const quand = jeu.dateMax ? new Date(jeu.dateMax).toLocaleString('fr-FR') : '—';
+    message.textContent = points.length + ' points affichés / ' + jeu.points.length + ' enregistrés — sauvegardé le ' + quand;
+    dessinerGraphique(points);
+    afficherTableau(points, intervalle);
   }
-  const quand = jeu.dateMax ? new Date(jeu.dateMax).toLocaleString('fr-FR') : '—';
-  message.textContent = points.length + ' points affichés / ' + jeu.points.length + ' enregistrés — sauvegardé le ' + quand;
-  dessinerGraphique(points);
-  afficherTableau(points, intervalle);
+  afficherActus(etat.actus);
+  if (jeu && jeu.points && jeu.points.length) {
+    const s = signalCombine(jeu.points, etat.actus);
+    afficherSignal(s);
+    notifierSiChangement(s, etat.actus);
+  } else {
+    afficherSignal(null);
+  }
 }
 
 async function telechargerJeu(jeu) {
-  const url = `${WORKER}/historique?range=${jeu.range}&interval=${jeu.interval}`;
-  const r = await fetch(url);
-  if (!r.ok) throw new Error('Réponse ' + r.status + ' pour ' + jeu.interval);
-  const data = await r.json();
-  if (!data.points || !data.points.length) throw new Error('Aucun point pour ' + jeu.interval);
-  return data;
+  const texte = await lire(urlCours(jeu));
+  const data = JSON.parse(texte);
+  const resultat = data && data.chart && data.chart.result && data.chart.result[0];
+  if (!resultat) throw new Error('Réponse Yahoo inattendue');
+  const timestamps = resultat.timestamp || [];
+  const q = (resultat.indicators && resultat.indicators.quote && resultat.indicators.quote[0]) || {};
+  const adj = (resultat.indicators && resultat.indicators.adjclose && resultat.indicators.adjclose[0]) || {};
+  const points = [];
+  for (let i = 0; i < timestamps.length; i++) {
+    const close = q.close ? q.close[i] : null;
+    if (close == null) continue;
+    points.push({
+      timestamp: timestamps[i],
+      open: q.open ? q.open[i] : null,
+      high: q.high ? q.high[i] : null,
+      low: q.low ? q.low[i] : null,
+      close: close,
+      adjclose: adj.adjclose ? adj.adjclose[i] : null,
+      volume: q.volume ? q.volume[i] : null
+    });
+  }
+  return { points, devise: (resultat.meta && resultat.meta.currency) || 'USD' };
 }
 
 async function toutActualiser() {
@@ -326,25 +596,25 @@ async function toutActualiser() {
   }
   const bouton = document.getElementById('charger');
   bouton.disabled = true;
-  let faits = 0, erreurs = [];
+  let faits = 0; const erreurs = [];
   for (const jeu of JEUX) {
     progression.textContent = 'Téléchargement ' + (faits + 1) + '/' + JEUX.length + ' : ' + jeu.libelle + '…';
     try {
       const data = await telechargerJeu(jeu);
-      etat.jeux[jeu.cle] = { points: data.points, devise: data.devise || 'USD', dateMax: Date.now() };
+      etat.jeux[jeu.cle] = { points: data.points, devise: data.devise, dateMax: Date.now() };
       ecrireCache(jeu.cle, data);
       faits++;
-    } catch (e) {
-      erreurs.push(jeu.cle + ' : ' + e.message);
-    }
+    } catch (e) { erreurs.push(jeu.cle + ' : ' + e.message); }
   }
+  progression.textContent = 'Actualités…';
+  try {
+    etat.actus = await chargerActus();
+    try { localStorage.setItem(CLE_ACTUS, JSON.stringify({ dateMax: Date.now(), actus: etat.actus })); } catch (e) { }
+  } catch (e) { erreurs.push('actus : ' + e.message); }
   bouton.disabled = false;
   progression.textContent = '';
-  if (erreurs.length) {
-    message.textContent = faits + '/' + JEUX.length + ' jeux actualisés. Erreurs : ' + erreurs.join(' ; ');
-  } else {
-    message.textContent = 'Tous les jeux actualisés (' + faits + '/' + JEUX.length + ').';
-  }
+  if (erreurs.length) message.textContent = faits + '/' + JEUX.length + ' jeux actualisés. Erreurs : ' + erreurs.join(' ; ');
+  else message.textContent = 'Tout actualisé (' + faits + '/' + JEUX.length + ' jeux + actualités).';
   afficher();
 }
 
@@ -354,24 +624,44 @@ document.getElementById('charger').onclick = () => { toutActualiser(); };
 
 const caseHL = document.getElementById('horsligne');
 caseHL.checked = localStorage.getItem(CLE_HORS_LIGNE) === '1';
-caseHL.addEventListener('change', () => {
-  try { localStorage.setItem(CLE_HORS_LIGNE, caseHL.checked ? '1' : '0'); } catch (e) { }
+caseHL.addEventListener('change', () => { try { localStorage.setItem(CLE_HORS_LIGNE, caseHL.checked ? '1' : '0'); } catch (e) { } });
+
+const caseAuto = document.getElementById('auto');
+caseAuto.checked = localStorage.getItem(CLE_AUTO) !== '0';
+caseAuto.addEventListener('change', () => {
+  try { localStorage.setItem(CLE_AUTO, caseAuto.checked ? '1' : '0'); } catch (e) { }
+  gererAuto();
 });
 
-// au démarrage : charger tous les jeux déjà sauvegardés
+let boucleAuto = null;
+function gererAuto() {
+  if (boucleAuto) { clearInterval(boucleAuto); boucleAuto = null; }
+  if (caseAuto.checked && !caseHL.checked) {
+    boucleAuto = setInterval(() => { if (!caseHL.checked) toutActualiser(); }, 30 * 60 * 1000);
+  }
+}
+
 for (const jeu of JEUX) {
   const cache = lireCache(jeu.cle);
   if (cache) etat.jeux[jeu.cle] = cache;
 }
-afficher();
+try {
+  const cacheActus = localStorage.getItem(CLE_ACTUS);
+  if (cacheActus) {
+    const p = JSON.parse(cacheActus);
+    if (p && Array.isArray(p.actus)) etat.actus = p.actus;
+  }
+} catch (e) { }
 
-// si aucun jeu n'est en cache et qu'on n'est pas hors-ligne, on télécharge tout
+afficher();
+gererAuto();
+
 const aucunCache = JEUX.every((j) => !etat.jeux[j.cle]);
 if (aucunCache && !caseHL.checked) toutActualiser();
 
-// ===== CONTRÔLE QUALITÉ — NE JAMAIS MODIFIER UN CAS POUR LE FAIRE PASSER =====
+// ===== CONTRÔLE QUALITÉ =====
 const normaliserEspaces = (s) => String(s).replace(/[\u202f\u00a0\u2009]/g, ' ');
-const MAINTENANT_TEST = Date.UTC(2026, 0, 15, 12, 0, 0); // 15 janvier 2026, 12:00 UTC
+const MAINTENANT_TEST = Date.UTC(2026, 0, 15, 12, 0, 0);
 const POINTS_TEST = [
   { timestamp: Math.floor(Date.UTC(2025, 0, 15, 12, 0, 0) / 1000) },
   { timestamp: Math.floor(Date.UTC(2025, 6, 15, 12, 0, 0) / 1000) },
@@ -379,6 +669,10 @@ const POINTS_TEST = [
   { timestamp: Math.floor(Date.UTC(2025, 11, 15, 12, 0, 0) / 1000) },
   { timestamp: Math.floor(Date.UTC(2020, 0, 15, 12, 0, 0) / 1000) },
 ];
+const SERIE_SIMPLE = [{ close: 1 }, { close: 2 }, { close: 3 }, { close: 4 }, { close: 5 }];
+const SERIE_HAUSSE = Array.from({ length: 50 }, (_, i) => ({ close: 100 + i }));
+const SERIE_BAISSE = Array.from({ length: 50 }, (_, i) => ({ close: 200 - i }));
+const SERIE_PLATE = Array.from({ length: 50 }, () => ({ close: 100 }));
 function controleQualite() {
   const cas = [
     ['Formatage 2.5 → 2,50', () => normaliserEspaces(formaterNombre(2.5)), '2,50'],
@@ -393,24 +687,30 @@ function controleQualite() {
     ['Filtre 5 ans exclut le point 2020', () => filtrerPoints(POINTS_TEST, '5y', MAINTENANT_TEST).length, 4],
     ['Filtre max garde les 5 points', () => filtrerPoints(POINTS_TEST, 'max', MAINTENANT_TEST).length, 5],
     ['Filtre liste vide renvoie 0', () => filtrerPoints([], '1y', MAINTENANT_TEST).length, 0],
+    ['SMA(3) sur [1,2,3,4,5] = 4', () => sma(SERIE_SIMPLE, 3), 4],
+    ['SMA(10) sur 5 points = null', () => sma(SERIE_SIMPLE, 10), null],
+    ['RSI(14) sur série croissante = 100', () => rsi(SERIE_HAUSSE, 14), 100],
+    ['RSI(14) sur série décroissante = 0', () => rsi(SERIE_BAISSE, 14), 0],
+    ['RSI(14) sur série plate = 50', () => rsi(SERIE_PLATE, 14), 50],
+    ['Analyse « approval » → +1', () => analyserTitre('approval'), 1],
+    ['Analyse « lawsuit » → -1', () => analyserTitre('lawsuit'), -1],
+    ['Analyse « xyz » → 0', () => analyserTitre('xyz'), 0],
   ];
   const ko = [];
   for (const [nom, f, attendu] of cas) {
     let obtenu;
     try { obtenu = f(); } catch (e) { obtenu = 'plantage : ' + e.message; }
     const ok = typeof attendu === 'number'
-      ? typeof obtenu === 'number' && Math.abs(obtenu - attendu) < 0.01
-      : String(obtenu) === String(attendu);
+      ? (typeof obtenu === 'number' && Math.abs(obtenu - attendu) < 0.01)
+      : (attendu === null ? obtenu === null : String(obtenu) === String(attendu));
     if (!ok) ko.push(nom + ' : attendu ' + JSON.stringify(attendu) + ', obtenu ' + JSON.stringify(obtenu));
   }
   const el = document.getElementById('controle');
-  if (el) el.textContent = ko.length
-    ? '❌ ' + ko.length + ' contrôle(s) sur ' + cas.length + ' en échec : ' + ko.join(' ; ')
-    : '✅ Tout est conforme (' + cas.length + '/' + cas.length + ')';
+  if (el) el.textContent = ko.length ? '❌ ' + ko.length + ' contrôle(s) sur ' + cas.length + ' en échec : ' + ko.join(' ; ') : '✅ Tout est conforme (' + cas.length + '/' + cas.length + ')';
   for (const k of ko) console.error('Contrôle qualité en échec — ' + k);
 }
+controleQualité = undefined; // placeholder pour éviter les erreurs si appelé par mégarde
 controleQualite();
-// ===== FIN DU CONTRÔLE QUALITÉ =====
 </script>
 </body>
 </html>
