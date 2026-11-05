@@ -19,11 +19,55 @@ jobs:
           persist-credentials: true
           fetch-depth: 0
 
-      - name: Miroir GitHub - Téléchargement des cours
+      - name: Miroir GitHub - Téléchargement des cours (yfinance)
         run: |
-          curl -s "https://query1.finance.yahoo.com/v8/finance/chart/NVS?range=max&interval=1d" -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)" -o cours_1d.json
-          curl -s "https://query1.finance.yahoo.com/v8/finance/chart/NVS?range=2y&interval=1h" -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)" -o cours_1h.json
-          
+          pip install yfinance
+          python -c "
+import yfinance as yf
+import json
+import datetime
+import sys
+
+def fetch_data(ticker, period, interval, filename):
+    try:
+        t = yf.Ticker(ticker)
+        hist = t.history(period=period, interval=interval)
+        if hist.empty:
+            print(f'Pas de donnees pour {ticker} {period} {interval}')
+            return
+        timestamps = [int(dt.timestamp()) for dt in hist.index]
+        open_p = hist['Open'].tolist()
+        high_p = hist['High'].tolist()
+        low_p = hist['Low'].tolist()
+        close_p = hist['Close'].tolist()
+        volume = hist['Volume'].tolist()
+        adjclose_p = close_p 
+        result = {
+            'chart': {
+                'result': [
+                    {
+                        'meta': {'symbol': ticker, 'currency': 'USD'},
+                        'timestamp': timestamps,
+                        'indicators': {
+                            'quote': [{
+                                'open': open_p, 'high': high_p, 'low': low_p, 'close': close_p, 'volume': volume
+                            }],
+                            'adjclose': [{'adjclose': adjclose_p}]
+                        }
+                    }
+                ]
+            }
+        }
+        with open(filename, 'w') as f:
+            json.dump(result, f)
+        print(f'Sauvegarde de {filename}')
+    except Exception as e:
+        print(f'Erreur: {e}')
+        sys.exit(1)
+
+fetch_data('NVS', 'max', '1d', 'cours_1d.json')
+fetch_data('NVS', '2y', '1h', 'cours_1h.json')
+"
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
           git add cours_1d.json cours_1h.json
