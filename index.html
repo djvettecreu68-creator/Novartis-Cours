@@ -65,7 +65,8 @@ th{color:#6B7785;font-weight:600;font-size:.8rem}
     <label for="auto">Surveillance en arrière-plan (24/7)</label>
   </div>
   <div class="ligne" style="margin-top:10px">
-    <button id="charger" style="flex:1">Tout actualiser maintenant</button>
+    <button id="charger" style="flex:2">Tout actualiser maintenant</button>
+    <button id="vider" style="flex:1;background:#D2463A">Vider le cache</button>
   </div>
   <div id="message"></div>
   <div id="progression"></div>
@@ -634,7 +635,11 @@ function afficher() {
 
 async function telechargerJeu(jeu) {
   const texte = await lire(urlCours(jeu));
-  const data = JSON.parse(texte);
+  if (!texte || texte.trim() === '') throw new Error('Réponse vide.');
+  if (texte.includes("Too Many Requests") || texte.includes("429")) throw new Error('Limite Yahoo atteinte (429).');
+  let data;
+  try { data = JSON.parse(texte); } catch (e) { throw new Error('JSON invalide.'); }
+  if (!data.chart || !data.chart.result || !data.chart.result[0]) throw new Error('Données introuvables.');
   const r = data.chart.result[0];
   const timestamps = r.timestamp || [];
   const q = r.indicators.quote[0] || {};
@@ -649,26 +654,56 @@ async function telechargerJeu(jeu) {
 async function toutActualiser() {
   const bouton = document.getElementById('charger');
   bouton.disabled = true;
+  document.getElementById('message').textContent = '';
   let faits = 0;
+  const erreurs = [];
+
+  // 1. On supprime les anciens caches pour être sûr de repartir à zéro
   for (const jeu of JEUX) {
-    document.getElementById('progression').textContent = 'Téléchargement ' + jeu.libelle + '…';
+    localStorage.removeItem(cleCache(jeu.cle));
+    etat.jeux[jeu.cle] = null;
+  }
+
+  // 2. Téléchargement des cours
+  for (const jeu of JEUX) {
+    document.getElementById('progression').textContent = 'Téléchargement ' + jeu.libelle + ' (' + jeu.range + ')…';
     try {
       const data = await telechargerJeu(jeu);
       etat.jeux[jeu.cle] = { points: data.points, devise: data.devise, dateMax: Date.now() };
       ecrireCache(jeu.cle, data);
       faits++;
-    } catch (e) { }
+    } catch (e) {
+      erreurs.push(jeu.libelle + ' : ' + e.message);
+    }
   }
+
+  // 3. Téléchargement des actualités
   document.getElementById('progression').textContent = 'Actualités…';
   try {
     etat.actus = await chargerActus();
     localStorage.setItem(CLE_ACTUS, JSON.stringify({ dateMax: Date.now(), actus: etat.actus }));
-  } catch (e) { }
+  } catch (e) {
+    erreurs.push('Actualités : ' + e.message);
+  }
+
   bouton.disabled = false;
   document.getElementById('progression').textContent = '';
-  document.getElementById('message').textContent = 'Actualisé avec succès.';
+  
+  // 4. Affichage du résultat
+  if (erreurs.length > 0) {
+    document.getElementById('message').textContent = '❌ Erreur(s) : ' + erreurs.join(' | ');
+  } else {
+    document.getElementById('message').textContent = '✅ Actualisé avec succès (' + faits + ' jeux téléchargés).';
+  }
   afficher();
 }
+
+document.getElementById('vider').onclick = () => {
+  if (confirm("Voulez-vous vraiment effacer toutes les données sauvegardées et repartir à zéro ?")) {
+    localStorage.clear();
+    location.reload();
+  }
+};
 
 document.getElementById('intervalle').addEventListener('change', () => { afficher(); });
 document.getElementById('periode').addEventListener('change', () => { afficher(); });
