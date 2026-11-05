@@ -329,7 +329,7 @@ jobs:
                       getSystemService(NotificationManager.class).createNotificationChannel(ch);
                       Notification n = new Notification.Builder(this, "novartis_service")
                           .setContentTitle("Novartis Cours actif")
-                          .setContentText("Surveille le marché toutes les 30 minutes...")
+                          .setContentText("Surveille le marché en arrière-plan.")
                           .setSmallIcon(android.R.drawable.ic_menu_compass)
                           .build();
                       startForeground(1, n);
@@ -340,10 +340,6 @@ jobs:
               public int onStartCommand(Intent intent, int flags, int startId) {
                   if (tache != null) return START_STICKY;
                   tache = () -> {
-                      // Cette action est un ping. Le calcul réel se fait via la WebView en tête.
-                      // Pour une vraie exécution en fond, on pourrait lancer une WebView cachée ici,
-                      // mais Android limite les WebViews en fond. Le plus sûr est de gérer la logique en Java.
-                      // Ici, on maintient simplement le service en vie.
                       handler.postDelayed(tache, minutes * 60 * 1000L);
                   };
                   handler.postDelayed(tache, minutes * 60 * 1000L);

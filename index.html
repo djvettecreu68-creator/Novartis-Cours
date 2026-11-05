@@ -12,7 +12,7 @@ body{margin:0;background:var(--fond);color:var(--txt);font:16px/1.45 system-ui,s
 h1{font-size:1.45rem;margin:0 0 4px}
 .sous{color:#6B7785;font-size:.9rem;margin-bottom:16px}
 .carte{background:var(--carte);border:1px solid var(--bord);border-radius:18px;padding:16px;margin-bottom:14px}
-select,button{font:inherit;border-radius:12px;border:1px solid var(--bord);padding:10px 12px;background:var(--carte);color:var(--txt)}
+select,button,input[type="date"],input[type="number"]{font:inherit;border-radius:12px;border:1px solid var(--bord);padding:10px 12px;background:var(--carte);color:var(--txt)}
 button{background:var(--prim);color:#fff;border:0;font-weight:700;min-height:44px;padding:0 18px}
 button:active{opacity:.85}
 button:disabled{opacity:.5}
@@ -69,6 +69,23 @@ th{color:#6B7785;font-weight:600;font-size:.8rem}
   </div>
   <div id="message"></div>
   <div id="progression"></div>
+</div>
+
+<div class="carte">
+  <div style="font-size:1.1rem;font-weight:700;margin-bottom:12px">Mon Épargne (FCPE Natixis)</div>
+  <div class="ligne" style="margin-bottom:10px">
+    <label for="vl_date" style="width:100%">Date de la VL :</label>
+    <input type="date" id="vl_date" style="flex:1">
+  </div>
+  <div class="ligne" style="margin-bottom:10px">
+    <label for="vl_ref" style="width:100%">Montant de la VL (€) :</label>
+    <input type="number" id="vl_ref" step="0.001" value="109.657" style="flex:1">
+    <button id="sauver_vl" style="padding:8px 12px;min-height:auto">OK</button>
+  </div>
+  <div id="resultat_vl" style="font-size:1.1rem;text-align:center;padding:12px;background:var(--fond);border-radius:12px">
+    Valeur actuelle estimée : <br><b style="font-size:1.4rem;color:var(--prim)">— €</b>
+  </div>
+  <div style="font-size:.72rem;color:#8B959E;margin-top:8px;text-align:center">Estimation basée sur la variation de l'action.</div>
 </div>
 
 <div class="carte">
@@ -322,7 +339,7 @@ function adx(points, n) {
   return adxVal;
 }
 
-// ===== MOTEUR DE DÉCISION (MULTI-TIMEFRAME) =====
+// ===== MOTEUR DE DÉCISION =====
 function analyserTitre(titre) {
   const t = String(titre || '').toLowerCase();
   const pos = ['beat', 'raise', 'approval', 'success', 'growth', 'upgrade', 'profit', 'breakthrough', 'record', 'approuv', 'hausse', 'bénéfice', 'succès', 'positif'];
@@ -349,7 +366,6 @@ function calculerSignal(journalier, horaire, actus) {
   let score = 0;
   const details = [];
 
-  // 1. Tendance de fond (Journalier)
   let tendance = 'neutre';
   if (adxJ != null && mm200 != null) {
     if (close > mm200 && adxJ > 20) tendance = 'haussiere';
@@ -359,22 +375,18 @@ function calculerSignal(journalier, horaire, actus) {
   score += ptsTendance;
   details.push({ nom: 'Tendance (1D)', valeur: tendance + ' (ADX ' + (adxJ ? adxJ.toFixed(1) : '—') + ')', pts: ptsTendance });
 
-  // 2. Momentum court terme (Horaire)
   let ptsMomentum = (mm50H && close > mm50H) ? 15 : -15;
   score += ptsMomentum;
   details.push({ nom: 'Momentum (1H)', valeur: mm50H ? 'Prix ' + (close > mm50H ? '>' : '<') + ' MM50' : '—', pts: ptsMomentum });
 
-  // 3. RSI Horaire
   let ptsRSI = rsiH <= 30 ? 25 : (rsiH >= 70 ? -25 : Math.round((50 - rsiH) / 2));
   score += ptsRSI;
   details.push({ nom: 'RSI (1H)', valeur: rsiH ? rsiH.toFixed(1) : '—', pts: ptsRSI });
 
-  // 4. MACD Horaire
   let ptsMACD = macdH && macdH.histogramme > 0 ? 15 : -15;
   score += ptsMACD;
   details.push({ nom: 'MACD (1H)', valeur: macdH ? macdH.histogramme.toFixed(3) : '—', pts: ptsMACD });
 
-  // 5. News
   let scoreNews = 0;
   for (const actu of actus) scoreNews += analyserTitre(actu.titre);
   let bonusNews = Math.max(-20, Math.min(20, scoreNews * 4));
@@ -403,11 +415,10 @@ function calculerSignal(journalier, horaire, actus) {
     explication = 'Pas de direction claire, marché indécis.';
   }
 
-  // Gestion du risque (Stop-Loss & Take-Profit) basé sur l'ATR Journalier
   let stopLoss = null, takeProfit = null, ratioRR = null;
   if (at && signal.includes('ACHAT')) {
     stopLoss = close - (at * 1.5);
-    takeProfit = close + (at * 3); // Ratio 1:2
+    takeProfit = close + (at * 3);
     ratioRR = '1 : 2';
   }
 
@@ -417,10 +428,8 @@ function calculerSignal(journalier, horaire, actus) {
 function lancerBacktest(journalier, horaire) {
   if (!journalier || journalier.length < 300) return null;
   let trades = 0, gagnants = 0, gainTotal = 0;
-  // On simule sur la partie journalière (tous les 5 jours)
   for (let i = 200; i < journalier.length - 30; i += 5) {
     const sJ = journalier.slice(0, i + 1);
-    // Pour faire simple dans le backtest, on utilise la même timeframe pour l'horaire (approximation)
     const sH = sJ; 
     const s = calculerSignal(sJ, sH, []);
     if (s.ok && s.signal.includes('ACHAT')) {
@@ -465,6 +474,61 @@ function afficherSignal(s) {
     const coul = d.pts > 0 ? 'var(--vert)' : (d.pts < 0 ? 'var(--rouge)' : '#6B7785');
     return '<div><span>' + d.nom + '</span><span style="color:#6B7785;font-size:.8rem;flex:1;text-align:right">' + d.valeur + '</span><span style="color:' + coul + ';font-weight:700;min-width:40px;text-align:right">' + signe + d.pts + '</span></div>';
   }).join('');
+}
+
+function mettreAJourVL(jeuJournalier) {
+  const vlRefInput = document.getElementById('vl_ref');
+  const vlDateInput = document.getElementById('vl_date');
+
+  let vlRef = parseFloat(localStorage.getItem('novartis.vlRef')) || 109.657;
+  let vlDate = localStorage.getItem('novartis.vlDate');
+  if (!vlDate) {
+    vlDate = new Date().toISOString().split('T')[0];
+    localStorage.setItem('novartis.vlDate', vlDate);
+  }
+  
+  vlRefInput.value = vlRef;
+  vlDateInput.value = vlDate;
+
+  document.getElementById('sauver_vl').onclick = () => {
+    const v = parseFloat(vlRefInput.value);
+    const d = vlDateInput.value;
+    if (v > 0 && d) {
+      localStorage.setItem('novartis.vlRef', v);
+      localStorage.setItem('novartis.vlDate', d);
+      afficher();
+    }
+  };
+
+  if (!jeuJournalier || !jeuJournalier.points || !jeuJournalier.points.length) return;
+  
+  const points = jeuJournalier.points;
+  const dernierPoint = points[points.length - 1];
+  const coursActuel = dernierPoint.adjclose || dernierPoint.close;
+
+  const targetTs = new Date(vlDate + 'T12:00:00Z').getTime() / 1000;
+  let pointRef = points[0];
+  let minDiff = Math.abs(points[0].timestamp - targetTs);
+  
+  for (let i = 1; i < points.length; i++) {
+    const diff = Math.abs(points[i].timestamp - targetTs);
+    if (diff < minDiff) {
+      minDiff = diff;
+      pointRef = points[i];
+    }
+  }
+
+  const coursRef = pointRef.adjclose || pointRef.close;
+  const variation = (coursActuel - coursRef) / coursRef;
+  const vlActuelle = vlRef * (1 + variation);
+  
+  const estVert = vlActuelle >= vlRef;
+  const pourcentage = (variation * 100).toFixed(2);
+  
+  document.getElementById('resultat_vl').innerHTML = 'Valeur actuelle estimée : <br>'
+    + '<b style="font-size:1.4rem;color:' + (estVert ? 'var(--vert)' : 'var(--rouge)') + '">' + formaterNombre(vlActuelle) + ' €</b>'
+    + '<br><span style="font-size:0.9rem;color:' + (estVert ? 'var(--vert)' : 'var(--rouge)') + '">'
+    + (estVert ? '▲ +' : '▼ ') + pourcentage + '% par rapport au ' + new Date(vlDate).toLocaleDateString('fr-FR') + '</span>';
 }
 
 function parserRSS(xml) {
@@ -548,6 +612,7 @@ function afficher() {
   afficherTableau(points, intervalle);
   afficherActus(etat.actus);
   
+  mettreAJourVL(j1);
   const s = calculerSignal(j1.points, j2 ? j2.points : j1.points, etat.actus);
   afficherSignal(s);
   
