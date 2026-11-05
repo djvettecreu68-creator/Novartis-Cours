@@ -593,14 +593,17 @@ function afficherTableau(points, intervalle) {
   document.getElementById('tableau').innerHTML = points.map((p) => `<tr><td>${formaterDate(p.timestamp, intervalle)}</td><td>${formaterNombre(p.open)}</td><td>${formaterNombre(p.high)}</td><td>${formaterNombre(p.low)}</td><td>${formaterNombre(p.close)}</td><td>${formaterNombre(p.adjclose)}</td><td>${formaterNombre(p.volume)}</td></tr>`).join('');
 }
 
-function afficher() {
+function afficher(erreurMsg) {
   const intervalle = document.getElementById('intervalle').value;
   const periode = document.getElementById('periode').value;
   const j1 = etat.jeux['1d'];
   const j2 = etat.jeux['1h'];
   
+  // On met à jour les champs de la VL même s'il n'y a pas de données
+  mettreAJourVL(j1);
+
   if (!j1 || !j1.points || !j1.points.length) {
-    document.getElementById('message').textContent = 'Aucune donnée. Actualise.';
+    document.getElementById('message').textContent = erreurMsg || 'Aucune donnée. Actualise.';
     afficherSignal(null); afficherActus([]);
     document.getElementById('backtest').textContent = '—';
     return;
@@ -658,13 +661,7 @@ async function toutActualiser() {
   let faits = 0;
   const erreurs = [];
 
-  // 1. On supprime les anciens caches pour être sûr de repartir à zéro
-  for (const jeu of JEUX) {
-    localStorage.removeItem(cleCache(jeu.cle));
-    etat.jeux[jeu.cle] = null;
-  }
-
-  // 2. Téléchargement des cours
+  // 1. Téléchargement des cours (on garde le cache actuel en cas d'échec)
   for (const jeu of JEUX) {
     document.getElementById('progression').textContent = 'Téléchargement ' + jeu.libelle + ' (' + jeu.range + ')…';
     try {
@@ -691,11 +688,10 @@ async function toutActualiser() {
   
   // 4. Affichage du résultat
   if (erreurs.length > 0) {
-    document.getElementById('message').textContent = '❌ Erreur(s) : ' + erreurs.join(' | ');
+    afficher('❌ Erreur(s) : ' + erreurs.join(' | '));
   } else {
-    document.getElementById('message').textContent = '✅ Actualisé avec succès (' + faits + ' jeux téléchargés).';
+    afficher();
   }
-  afficher();
 }
 
 document.getElementById('vider').onclick = () => {

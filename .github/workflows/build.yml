@@ -250,7 +250,7 @@ jobs:
                           String corps = ""; int statut = 0;
                           try {
                               java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
-                              c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14)");
+                              c.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
                               c.setConnectTimeout(15000); c.setReadTimeout(20000);
                               statut = c.getResponseCode();
                               java.io.InputStream is = (statut >= 400) ? c.getErrorStream() : c.getInputStream();
