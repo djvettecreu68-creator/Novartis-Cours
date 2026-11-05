@@ -701,7 +701,19 @@ async function toutActualiser() {
 document.getElementById('vider').onclick = () => {
   if (confirm("Voulez-vous vraiment effacer toutes les données sauvegardées et repartir à zéro ?")) {
     localStorage.clear();
-    location.reload();
+    etat.jeux = {};
+    etat.actus = [];
+    
+    // Réinitialisation de l'interface sans recharger la page
+    document.getElementById('vl_ref').value = '';
+    document.getElementById('vl_date').value = '';
+    document.getElementById('resultat_vl').innerHTML = 'Valeur actuelle estimée : <br><b style="font-size:1.4rem;color:var(--prim)">— €</b>';
+    document.getElementById('message').textContent = '✅ Cache vidé. Clique sur "Tout actualiser" pour recharger.';
+    document.getElementById('progression').textContent = '';
+    document.getElementById('backtest').textContent = '—';
+    document.getElementById('actus').innerHTML = '';
+    
+    afficher();
   }
 };
 
