@@ -22,52 +22,52 @@ jobs:
       - name: Miroir GitHub - Téléchargement des cours (yfinance)
         run: |
           pip install yfinance
-          python -c "
-import yfinance as yf
-import json
-import datetime
-import sys
+          cat > fetch_cours.py <<'EOF_PY'
+          import yfinance as yf
+          import json
+          import sys
 
-def fetch_data(ticker, period, interval, filename):
-    try:
-        t = yf.Ticker(ticker)
-        hist = t.history(period=period, interval=interval)
-        if hist.empty:
-            print(f'Pas de donnees pour {ticker} {period} {interval}')
-            return
-        timestamps = [int(dt.timestamp()) for dt in hist.index]
-        open_p = hist['Open'].tolist()
-        high_p = hist['High'].tolist()
-        low_p = hist['Low'].tolist()
-        close_p = hist['Close'].tolist()
-        volume = hist['Volume'].tolist()
-        adjclose_p = close_p 
-        result = {
-            'chart': {
-                'result': [
-                    {
-                        'meta': {'symbol': ticker, 'currency': 'USD'},
-                        'timestamp': timestamps,
-                        'indicators': {
-                            'quote': [{
-                                'open': open_p, 'high': high_p, 'low': low_p, 'close': close_p, 'volume': volume
-                            }],
-                            'adjclose': [{'adjclose': adjclose_p}]
-                        }
-                    }
-                ]
-            }
-        }
-        with open(filename, 'w') as f:
-            json.dump(result, f)
-        print(f'Sauvegarde de {filename}')
-    except Exception as e:
-        print(f'Erreur: {e}')
-        sys.exit(1)
+          def fetch_data(ticker, period, interval, filename):
+              try:
+                  t = yf.Ticker(ticker)
+                  hist = t.history(period=period, interval=interval)
+                  if hist.empty:
+                      print('Pas de donnees pour', ticker, period, interval)
+                      return
+                  timestamps = [int(dt.timestamp()) for dt in hist.index]
+                  open_p = hist['Open'].tolist()
+                  high_p = hist['High'].tolist()
+                  low_p = hist['Low'].tolist()
+                  close_p = hist['Close'].tolist()
+                  volume = hist['Volume'].tolist()
+                  adjclose_p = close_p 
+                  result = {
+                      'chart': {
+                          'result': [
+                              {
+                                  'meta': {'symbol': ticker, 'currency': 'USD'},
+                                  'timestamp': timestamps,
+                                  'indicators': {
+                                      'quote': [{
+                                          'open': open_p, 'high': high_p, 'low': low_p, 'close': close_p, 'volume': volume
+                                      }],
+                                      'adjclose': [{'adjclose': adjclose_p}]
+                                  }
+                              }
+                          ]
+                      }
+                  }
+                  with open(filename, 'w') as f:
+                      json.dump(result, f)
+                  print('Sauvegarde de', filename)
+              except Exception as e:
+                  print('Erreur:', e)
+                  sys.exit(1)
 
-fetch_data('NVS', 'max', '1d', 'cours_1d.json')
-fetch_data('NVS', '2y', '1h', 'cours_1h.json')
-"
+          fetch_data('NVS', 'max', '1d', 'cours_1d.json')
+          fetch_data('NVS', '2y', '1h', 'cours_1h.json')
+          EOF_PY
+          python fetch_cours.py
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
           git add cours_1d.json cours_1h.json
