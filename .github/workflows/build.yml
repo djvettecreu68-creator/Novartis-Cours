@@ -577,7 +577,7 @@ jobs:
               /** Écrit dans le widget ce qu'il doit afficher : VL, direction, fourchettes, indicateurs. */
               static void enregistrerWidget(Context c, Serie novn, Serie nvs, Double vl, JSONObject cfg) {
                   try {
-                      String vlTxt = "— €", varTxt = "", varCls = "doux", achatTxt = "", alTxt = "", dirTitre = "", dirTexte = "", c1 = "", c2 = "", c3 = "", c4 = "", f1 = "", f5 = "";
+                      String vlTxt = "— €", varTxt = "", varCls = "doux", achatTxt = "", alTxt = "", dirTitre = "", dirTexte = "", c1 = "", c2 = "", c3 = "", c4 = "", f1 = "", f5 = "", varDetail = "";
                       double vlAchat = cfg.optDouble("vlAchat", 0);
                       double vlRef = cfg.optDouble("vlRef", 0);
                       String achatVar = "", achatCls = "doux";
@@ -588,6 +588,11 @@ jobs:
                               double var = (vl / vlRef - 1) * 100;
                               varTxt = String.format(Locale.FRANCE, "%+.2f %%", var);
                               varCls = var > 0 ? "vert" : (var < 0 ? "rouge" : "doux");
+                              String vDate = cfg.optString("vlDate", "");
+                              if (vDate.length() == 10) {
+                                  String[] p = vDate.split("-");
+                                  if (p.length == 3) varDetail = " depuis la VL du " + p[2] + "/" + p[1] + "/" + p[0] + " (" + nombre(vlRef) + " €)";
+                              }
                           } else if (vlAchat > 0) {
                               double var = (vl / vlAchat - 1) * 100;
                               varTxt = String.format(Locale.FRANCE, "%+.2f %%", var);
@@ -647,7 +652,7 @@ jobs:
                       }
 
                       JSONObject w = new JSONObject();
-                      w.put("vl", vlTxt); w.put("var", varTxt); w.put("varCls", varCls); 
+                      w.put("vl", vlTxt); w.put("var", varTxt); w.put("varDetail", varDetail); w.put("varCls", varCls); 
                       w.put("achat", achatTxt); w.put("achatVar", achatVar); w.put("achatCls", achatCls);
                       w.put("alerte", alTxt); w.put("dirTitre", dirTitre); w.put("dirTexte", dirTexte);
                       w.put("f1", f1); w.put("f5", f5); w.put("c1", c1); w.put("c2", c2); w.put("c3", c3); w.put("c4", c4);
@@ -757,18 +762,27 @@ jobs:
                       android:layout_height="wrap_content"
                       android:text="109,84 €"
                       android:textColor="#FFFFFF"
-                      android:textSize="18sp"
+                      android:textSize="22sp"
                       android:textStyle="bold" />
                   <TextView
                       android:id="@+id/w_var"
                       android:layout_width="wrap_content"
                       android:layout_height="wrap_content"
-                      android:layout_marginStart="6dp"
+                      android:layout_marginStart="8dp"
                       android:text="-1,99 %"
                       android:textColor="#EF7468"
-                      android:textSize="13sp"
+                      android:textSize="14sp"
                       android:textStyle="bold" />
               </LinearLayout>
+              
+              <TextView
+                  android:id="@+id/w_var_detail"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:text="depuis la VL du 04/11/2026 (112,07 €)"
+                  android:textColor="#E0FFFFFF"
+                  android:textSize="10sp"
+                  android:layout_marginTop="2dp" />
 
               <TextView
                   android:id="@+id/w_alerte"
@@ -957,6 +971,7 @@ jobs:
                       if (brut.isEmpty()) {
                           v.setTextViewText(R.id.w_vl, "Ouvre l'appli");
                           v.setTextViewText(R.id.w_var, "");
+                          v.setTextViewText(R.id.w_var_detail, "");
                           v.setTextViewText(R.id.w_alerte, "");
                           v.setTextViewText(R.id.w_dirTitre, "");
                           v.setTextViewText(R.id.w_dirTexte, "pour voir les cours");
@@ -978,17 +993,20 @@ jobs:
                           else if (cls.equals("rouge")) v.setTextColor(R.id.w_var, android.graphics.Color.parseColor("#EF7468"));
                           else v.setTextColor(R.id.w_var, android.graphics.Color.parseColor("#9AA7B2"));
                           
+                          v.setTextViewText(R.id.w_var_detail, d.optString("varDetail", ""));
                           v.setTextViewText(R.id.w_alerte, d.optString("alerte", ""));
                           v.setTextViewText(R.id.w_dirTitre, d.optString("dirTitre", ""));
                           v.setTextViewText(R.id.w_dirTexte, d.optString("dirTexte", ""));
                           v.setTextViewText(R.id.w_f1, d.optString("f1", ""));
                           v.setTextViewText(R.id.w_f5, d.optString("f5", ""));
+                          
                           v.setTextViewText(R.id.w_achat, d.optString("achat", ""));
                           v.setTextViewText(R.id.w_achat_pct, d.optString("achatVar", ""));
                           String aCls = d.optString("achatCls", "doux");
                           if (aCls.equals("vert")) v.setTextColor(R.id.w_achat_pct, android.graphics.Color.parseColor("#4CC27A"));
                           else if (aCls.equals("rouge")) v.setTextColor(R.id.w_achat_pct, android.graphics.Color.parseColor("#EF7468"));
                           else v.setTextColor(R.id.w_achat_pct, android.graphics.Color.parseColor("#80FFFFFF"));
+
                           v.setTextViewText(R.id.w_c1, d.optString("c1", ""));
                           v.setTextViewText(R.id.w_c2, d.optString("c2", ""));
                           v.setTextViewText(R.id.w_c3, d.optString("c3", ""));
@@ -998,6 +1016,7 @@ jobs:
                   } catch (Exception e) {
                       v.setTextViewText(R.id.w_vl, "Erreur widget");
                       v.setTextViewText(R.id.w_var, "");
+                      v.setTextViewText(R.id.w_var_detail, "");
                       v.setTextViewText(R.id.w_alerte, "");
                       v.setTextViewText(R.id.w_dirTitre, "");
                       v.setTextViewText(R.id.w_dirTexte, "");
@@ -1019,6 +1038,7 @@ jobs:
                   v.setOnClickPendingIntent(R.id.w_titre, pi);
                   v.setOnClickPendingIntent(R.id.w_vl, pi);
                   v.setOnClickPendingIntent(R.id.w_var, pi);
+                  v.setOnClickPendingIntent(R.id.w_var_detail, pi);
                   v.setOnClickPendingIntent(R.id.w_alerte, pi);
                   v.setOnClickPendingIntent(R.id.w_dirTitre, pi);
                   v.setOnClickPendingIntent(R.id.w_dirTexte, pi);

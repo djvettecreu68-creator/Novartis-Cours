@@ -534,6 +534,7 @@ function afficherFCPE() {
   const r = calculFCPE(d, vlRef, vlDate);
   if (r.erreur) return vide(r.erreur);
   id('vlEstimee').textContent = formaterNombre(r.vl) + '\u00a0€';
+  
   let varHtml = '<span class="' + classe(r.variationPct) + '">' + pct(r.variationPct, 2) + '</span> depuis ta VL du ' + dateFR(vlDate) + ' (' + formaterNombre(vlRef, 3) + '\u00a0€)';
   const vlAchat = lireNombre(localStorage.getItem(CLE.vlAchat));
   if (vlAchat) {
@@ -664,16 +665,17 @@ function majWidgetAppli() {
   try {
     const d = etat.donnees || {};
     const vlRef = lireNombre(localStorage.getItem(CLE.vlRef)), vlDate = localStorage.getItem(CLE.vlDate);
+    const vlAchat = lireNombre(localStorage.getItem(CLE.vlAchat));
     const r = vlRef && vlDate && d.novn && d.eurchf ? calculFCPE(d, vlRef, vlDate) : null;
     const v = d.novn ? directionCT(d.novn.a) : null;
-    const vlAchat = lireNombre(localStorage.getItem(CLE.vlAchat));
     
-    let vlTxt = '— €', varTxt = '', varCls = 'doux', achatTxt = '', achatVar = '', achatCls = 'doux';
+    let vlTxt = '— €', varTxt = '', varCls = 'doux', achatTxt = '', achatVar = '', achatCls = 'doux', varDetail = '';
     const parts = lireNombre(localStorage.getItem(CLE.parts));
     if (r && !r.erreur) {
       vlTxt = formaterNombre(r.vl) + ' €';
-      varTxt = pct(r.variationPct, 2);
+      varTxt = pct(r.variationPct, 2); 
       varCls = r.variationPct > 0 ? 'vert' : (r.variationPct < 0 ? 'rouge' : 'doux');
+      if (vlDate && vlRef) varDetail = ' depuis la VL du ' + dateFR(vlDate) + ' (' + formaterNombre(vlRef) + ' €)';
       if (vlAchat) {
         const vp = (r.vl / vlAchat - 1) * 100;
         const gain = parts ? parts * (r.vl - vlAchat) : null;
@@ -683,10 +685,6 @@ function majWidgetAppli() {
       }
     }
     
-    const al = lireAlertes();
-    let alTxt = '';
-    if (al.actif && al.vlBas) alTxt = 'Alerte : sous ' + formaterNombre(al.vlBas) + ' €';
-
     let dirTitre = '', dirTexte = '', c1 = '', c2 = '', c3 = '', c4 = '';
     if (v) {
       dirTitre = TEXTES_CT[v.couleur][0];
@@ -708,7 +706,7 @@ function majWidgetAppli() {
        }
     }
     
-    A.majWidget(JSON.stringify({ vl: vlTxt, var: varTxt, varCls: varCls, achat: achatTxt, achatVar: achatVar, achatCls: achatCls, alerte: alTxt, dirTitre: dirTitre, dirTexte: dirTexte, f1: f1, f5: f5, c1: c1, c2: c2, c3: c3, c4: c4, quand: d.quand ? quand(d.quand) : '' }));
+    A.majWidget(JSON.stringify({ vl: vlTxt, var: varTxt, varDetail: varDetail, varCls: varCls, achat: achatTxt, achatVar: achatVar, achatCls: achatCls, dirTitre: dirTitre, dirTexte: dirTexte, f1: f1, f5: f5, c1: c1, c2: c2, c3: c3, c4: c4, quand: d.quand ? quand(d.quand) : '' }));
   } catch (e) { console.error('Widget : ' + ((e && e.stack) || e)); }
 }
 
@@ -1086,7 +1084,6 @@ id('enregistrerAchat').onclick = () => {
   sur(afficherFCPE);
   envoyerAlertes();
 };
-
 id('actus').addEventListener('click', (e) => {
   const el = e.target.closest('[data-i]'), a = etat.donnees && etat.donnees.actus;
   const x = el && a && a.liste[+el.dataset.i];
