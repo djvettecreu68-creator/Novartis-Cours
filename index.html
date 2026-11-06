@@ -78,28 +78,14 @@ button.secondaire{background:var(--bord);color:var(--txt)}
   </section>
 
   <section class="carte">
-    <div class="titre">🧠 L’avis de l’IA</div>
-    <div class="gros" id="iaTitre" style="font-size:1.5rem">—</div>
-    <div id="iaConseil" style="margin-top:6px"></div>
-    <div id="iaPourquoi" class="doux" style="margin-top:8px"></div>
-    <div id="iaVigilance" class="note"></div>
-    <div id="iaEtat" class="note"></div>
-    <div class="boutons"><button id="iaRelancer" class="secondaire">Redemander une analyse</button></div>
-    <label class="doux" style="display:flex;flex-direction:column;gap:4px;margin-top:14px">Pose ta question à l’IA<textarea id="iaQuestion" rows="2" maxlength="500" placeholder="ex. Pourquoi ça baisse aujourd’hui ?" style="font:inherit;border-radius:12px;border:1px solid var(--bord);padding:9px 11px;background:var(--carte);color:var(--txt)"></textarea></label>
-    <button id="iaDemander" style="margin-top:10px;width:100%">Demander</button>
-    <div id="iaReponse" style="margin-top:10px;white-space:pre-wrap"></div>
-    <div class="note">L’IA gratuite de Cloudflare lit les chiffres calculés par l’appli et les actus du jour. Elle explique, elle ne connaît pas l’avenir. Ton nombre de parts n’est pas envoyé.</div>
-  </section>
-
-  <section class="carte">
-    <div class="titre">Le bon moment ?</div>
-    <div class="gros" id="voyant">—</div>
-    <div id="voyantTexte" class="doux"></div>
-    <div id="voyantChecks" style="margin-top:8px"></div>
-    <div id="voyantBilan" class="note"></div>
-    <div id="bulletin" class="note"></div>
-    <label class="case" style="margin-top:12px"><input type="checkbox" id="voyantAlerte"><span>Me prévenir quand le voyant change de couleur (vérifié chaque soir après la clôture de Zurich)</span></label>
-    <div class="note">4 vérifications automatiques sur l’action à Zurich, comme un trader. Personne ne sait prédire la Bourse : c’est un repère, pas une garantie.</div>
+    <div class="titre">🔮 Prévision de ta VL</div>
+    <div class="gros" id="prevVL">— €</div>
+    <div id="prevTexte" class="doux"></div>
+    <div id="prevFourchettes" style="margin-top:8px"></div>
+    <div id="prevChecks" style="margin-top:8px"></div>
+    <div id="prevFiabilite" class="note"></div>
+    <label class="case" style="margin-top:12px"><input type="checkbox" id="voyantAlerte"><span>Me prévenir quand la direction prévue change (vérifié chaque soir après la clôture de Zurich)</span></label>
+    <div class="note">Calculé par l’appli à partir de l’action à Zurich. La fourchette est solide ; la direction, personne ne la prévoit vraiment : regarde sa fiabilité mesurée juste au-dessus.</div>
   </section>
 
   <section class="carte">
@@ -112,6 +98,15 @@ button.secondaire{background:var(--bord);color:var(--txt)}
 
   <button id="voirDetails" class="secondaire large">Voir les détails</button>
   <div id="details" class="grille large" hidden>
+  <section class="carte">
+    <div class="titre">Tendance de fond (long terme)</div>
+    <div class="gros" id="voyant">—</div>
+    <div id="voyantTexte" class="doux"></div>
+    <div id="voyantChecks" style="margin-top:8px"></div>
+    <div id="voyantBilan" class="note"></div>
+    <div id="bulletin" class="note"></div>
+    <div class="note">4 vérifications automatiques sur l’action à Zurich, comme un trader. Personne ne sait prédire la Bourse : c’est un repère, pas une garantie.</div>
+  </section>
   <section class="carte">
     <div class="titre">L’action Novartis</div>
     <div class="ligne"><span>Zurich (NOVN)</span><b id="prixNovn">—</b></div>
@@ -651,7 +646,7 @@ function afficherActus() {
 }
 
 function toutAfficher() {
-  [afficherFCPE, afficherCours, afficherReperes, afficherBacktest, dessiner, afficherActus, afficherAlertes, afficherVoyant, afficherBulletin, afficherAvisIA].forEach(sur);
+  [afficherFCPE, afficherCours, afficherReperes, afficherBacktest, dessiner, afficherActus, afficherAlertes, afficherVoyant, afficherBulletin, afficherPrevision].forEach(sur);
   maj(etatEntete());
 }
 
@@ -891,94 +886,66 @@ function afficherBulletin() {
     + (changements.length ? '<div style="margin-top:8px">Derniers changements : ' + changements.map(echapper).join(' · ') + '</div>' : '');
 }
 
-// ---------- Le cerveau IA (1.6) : l’IA gratuite de Cloudflare, via le serveur novartis-ia (les clés restent sur le serveur) ----------
-const IA_URL = 'https://novartis-cours.djvettecreu68.workers.dev';
-const CLE_IA = 'novartis.ia.analyse';
-const COULEURS_IA = { vert: '🟢', orange: '🟠', rouge: '🔴' };
-// réponse de l’IA → avis propre, ou null si elle est inutilisable
-function lireAvisIA(texte) {
-  let o;
-  try { o = typeof texte === 'string' ? JSON.parse(texte) : texte; } catch (e) { return null; }
-  if (!o || typeof o.titre !== 'string' || typeof o.conseil !== 'string') return null;
-  return {
-    couleur: COULEURS_IA[o.couleur] ? o.couleur : 'orange', titre: o.titre.slice(0, 80), conseil: o.conseil.slice(0, 400),
-    pourquoi: Array.isArray(o.pourquoi) ? o.pourquoi.filter((x) => typeof x === 'string').slice(0, 5).map((x) => x.slice(0, 300)) : [],
-    vigilance: typeof o.vigilance === 'string' ? o.vigilance.slice(0, 300) : '',
-    confiance: ['faible', 'moyenne', 'élevée'].includes(o.confiance) ? o.confiance : 'moyenne',
-  };
+// ---------- Prévision de la VL (1.8) : calculée par l’appli, sans IA ----------
+// direction à court terme : 4 vérifications sur l’action à Zurich (mêmes règles que la veille Android)
+function directionCT(valeurs) {
+  const x = nombres(valeurs), n = x.length;
+  if (n < 25) return null;
+  const p = x[n - 1], m10 = sma(x, 10), m20 = sma(x, 20), r = rsi(x.slice(-100), 14);
+  const checks = [p > x[n - 6], p > m10, m10 > m20, r < 70];
+  const score = checks.filter(Boolean).length;
+  return { score, checks, rsi: r, couleur: couleurDuScore(score) };
 }
-// tout ce que l’appli sait aujourd’hui, en chiffres, pour l’IA (ton nombre de parts n’est pas envoyé)
-function contexteIA() {
-  const d = etat.donnees || {}, r = (v, k) => (v == null || !isFinite(v) ? null : Math.round(v * Math.pow(10, k == null ? 2 : k)) / Math.pow(10, k == null ? 2 : k));
-  const ctx = { date: aujourdhui(), situation: 'Salarié de Novartis en France. Épargne en FCPE d’actionnariat salarié Novartis (Natixis Interépargne) : parts en principe bloquées 5 ans sauf cas de déblocage, vente au prix de la VL suivante, versements volontaires possibles avec abondement de l’employeur. Peut aussi acheter ou vendre des actions NVS sur un compte-titres.' };
+// direction à chaque séance, avec les seuls cours connus ce jour-là
+function couleursCT(a) { return a.map((p, i) => (i < 24 ? null : directionCT(a.slice(Math.max(0, i - 99), i + 1)).couleur)); }
+// agitation : écart type des variations quotidiennes sur les 60 dernières séances
+function volJour(valeurs) {
+  const x = nombres(valeurs).slice(-61);
+  if (x.length < 3) return null;
+  const r = [];
+  for (let i = 1; i < x.length; i++) r.push(Math.log(x[i] / x[i - 1]));
+  const m = r.reduce((s, v) => s + v, 0) / r.length;
+  return Math.sqrt(r.reduce((s, y) => s + (y - m) * (y - m), 0) / (r.length - 1));
+}
+// fourchette « 2 chances sur 3 » autour de la VL, dans « jours » séances
+function fourchetteVL(vl, sigma, jours) { const e = sigma * Math.sqrt(jours); return [vl * Math.exp(-e), vl * Math.exp(e)]; }
+const TEXTES_CT = {
+  vert: ['🟢 Plutôt hausse', 'La plupart des indicateurs penchent vers la hausse.'],
+  orange: ['🟠 Indécis', 'Les indicateurs se contredisent : plutôt attendre.'],
+  rouge: ['🔴 Plutôt baisse', 'La plupart des indicateurs penchent vers la baisse.'],
+};
+function afficherPrevision() {
+  const d = etat.donnees || {}, s = d.novn;
   const vlRef = lireNombre(localStorage.getItem(CLE.vlRef)), vlDate = localStorage.getItem(CLE.vlDate);
-  if (vlRef && vlDate && d.novn && d.eurchf) {
-    const f = calculFCPE(d, vlRef, vlDate);
-    if (!f.erreur) ctx.fcpe = { derniere_vl_eur: vlRef, date_vl: vlDate, vl_estimee_eur: r(f.vl), variation_depuis_vl_pct: r(f.variationPct) };
-  }
-  if (d.novn) {
-    const s = d.novn, c = s.c, n = c.length, an = c.slice(-SEANCES_AN), v = voyant(s.a), t = testerVoyant(s);
-    ctx.action_zurich = {
-      cours_chf: c[n - 1], seance: s.j[n - 1], variation_seance_pct: r(variationJour(s)), variation_1_mois_pct: r((c[n - 1] / c[Math.max(0, n - 22)] - 1) * 100),
-      variation_1_an_pct: r((c[n - 1] / an[0] - 1) * 100), plus_haut_1_an_chf: Math.max(...an), plus_bas_1_an_chf: Math.min(...an),
-      ecart_moyenne_200j_pct: n >= 200 ? r((c[n - 1] / sma(c, 200) - 1) * 100) : null, volatilite_annuelle_pct: r(volatiliteAnnuelle(c.slice(-(SEANCES_AN + 1))), 1),
-    };
-    if (v) ctx.voyant_technique = { couleur: v.couleur, verifications_ok_sur_4: v.score, rsi14: r(v.rsi, 0) };
-    if (t) ctx.bilan_voyant_5_ans = { depuis: t.depuis, suivre_le_voyant_pct: r(t.voyant.gainPct, 0), garder_pct: r(t.garde.gainPct, 0) };
-  }
-  if (d.nvs) ctx.nvs_new_york = { cours_usd: dernier(d.nvs.c), variation_seance_pct: r(variationJour(d.nvs)) };
-  if (d.eurchf) ctx.change = { eur_chf: dernier(d.eurchf.c), eur_usd: d.eurusd ? dernier(d.eurusd.c) : null };
-  if (d.actus) ctx.actualites = d.actus.liste.slice(0, 10).map((x) => ({ titre: x.titre, source: x.source, date: x.date ? new Date(x.date).toISOString().slice(0, 10) : null }));
-  return ctx;
-}
-async function appelerIA(chemin, corps) {
-  const rep = await fetch(IA_URL + chemin, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corps) });
-  const data = await rep.json().catch(() => ({ erreur: 'réponse illisible du serveur (' + rep.status + ')' }));
-  if (data.erreur) throw new Error(data.erreur);
-  return data;
-}
-function afficherAvisIA() {
-  const m = lireJSON(CLE_IA), a = m && lireAvisIA(m.avis);
-  if (!a) {
-    id('iaTitre').textContent = '—'; id('iaConseil').textContent = DANS_APPLI ? '' : 'L’IA marche seulement dans l’appli, sur le téléphone.';
-    id('iaPourquoi').innerHTML = ''; id('iaVigilance').textContent = '';
+  const f = s && d.eurchf && vlRef && vlDate ? calculFCPE(d, vlRef, vlDate) : null;
+  const v = s ? directionCT(s.a) : null;
+  id('voyantAlerte').checked = !!lireAlertes().voyant;
+  if (!f || f.erreur || !v) {
+    id('prevVL').textContent = '— €';
+    id('prevTexte').textContent = !s ? 'En attente des cours…' : (!vlRef ? 'Entre ta dernière VL dans « Mon FCPE » pour voir la prévision.' : (f && f.erreur) || 'Pas assez d’historique.');
+    id('prevFourchettes').innerHTML = ''; id('prevChecks').innerHTML = ''; id('prevFiabilite').textContent = '';
     return;
   }
-  id('iaTitre').textContent = COULEURS_IA[a.couleur] + ' ' + a.titre;
-  id('iaConseil').textContent = a.conseil;
-  id('iaPourquoi').innerHTML = a.pourquoi.map((x) => '• ' + echapper(x)).join('<br>');
-  id('iaVigilance').textContent = (a.vigilance ? '⚠️ ' + a.vigilance + ' ' : '') + '(confiance de l’IA : ' + a.confiance + ', analyse du ' + dateFR(m.jour) + ' à ' + m.heure + ')';
+  const sig = volJour(s.a), f1 = fourchetteVL(f.vl, sig, 1), f5 = fourchetteVL(f.vl, sig, 5);
+  const ligne = (t, val) => '<div class="ligne"><span>' + t + '</span><b>' + val + '</b></div>';
+  id('prevVL').textContent = formaterNombre(f.vl) + '\u00a0€';
+  id('prevTexte').textContent = 'Ta VL si tu arbitres aujourd’hui (estimée en direct pendant la séance de Zurich).';
+  id('prevFourchettes').innerHTML = ligne('Demain', formaterNombre(f1[0]) + ' – ' + formaterNombre(f1[1]) + '\u00a0€')
+    + ligne('Dans 5 jours', formaterNombre(f5[0]) + ' – ' + formaterNombre(f5[1]) + '\u00a0€')
+    + '<div class="note">Fourchettes « 2 chances sur 3 », calculées sur l’agitation des 3 derniers mois.</div>'
+    + '<div class="gros" style="font-size:1.5rem;margin-top:12px">' + TEXTES_CT[v.couleur][0] + '</div><div class="doux">' + TEXTES_CT[v.couleur][1] + ' (' + v.score + ' sur 4)</div>';
+  const noms = ['En hausse sur 5 jours', 'Au-dessus de sa moyenne 10 jours', 'Moyenne 10 jours au-dessus de la 20 jours', 'Pas en surchauffe (RSI ' + formaterNombre(v.rsi, 0) + ', il faut moins de 70)'];
+  id('prevChecks').innerHTML = noms.map((t, k) => '<div class="ligne"><span>' + t + '</span><b class="' + (v.checks[k] ? 'hausse' : 'baisse') + '">' + (v.checks[k] ? '✓' : '✗') + '</b></div>').join('');
+  // fiabilité mesurée sur les 2 dernières années
+  const a = s.a, n = a.length, debut = Math.max(25, n - 1 - 2 * SEANCES_AN), coul = couleursCT(a);
+  const b1 = bulletin(a, coul, debut, 1), b5 = bulletin(a, coul, debut, 5);
+  const pc = (x, m) => (m ? formaterNombre(x / m * 100, 0) + '\u00a0%' : '—');
+  const prix = a.slice(debut), arb = backtest(prix, coul.slice(debut).map((c) => (c === 'vert' ? 1 : 0)), 0), garde = backtest(prix, prix.map(() => 1), 0);
+  id('prevFiabilite').innerHTML = '<b style="color:var(--txt)">Fiabilité mesurée sur 2 ans</b><br>'
+    + 'Après « plutôt hausse », la VL a monté le lendemain ' + pc(b1.vert.bons, b1.vert.n) + ' du temps (au hasard : ' + pc(b1.tous.hausses, b1.tous.n) + '), et 5 jours après ' + pc(b5.vert.bons, b5.vert.n) + ' (au hasard : ' + pc(b5.tous.hausses, b5.tous.n) + ').<br>'
+    + 'Après « plutôt baisse », elle a baissé le lendemain ' + pc(b1.rouge.bons, b1.rouge.n) + ' du temps (au hasard : ' + pc(b1.tous.n - b1.tous.hausses, b1.tous.n) + ').<br>'
+    + 'Arbitrer selon ce voyant (fonds Novartis quand c’est vert, fonds calme sinon, à la VL suivante, sans frais) : ' + pct(arb.gainPct, 0) + ' en 2 ans. Rester dans le fonds Novartis : ' + pct(garde.gainPct, 0) + '.';
 }
-let iaEnCours = false;
-async function analyserIA(forcer) {
-  const d = etat.donnees, m = lireJSON(CLE_IA);
-  if (iaEnCours || !DANS_APPLI || !d || !d.novn) return;
-  if (!forcer && m && m.jour === aujourdhui() && m.seance === dernier(d.novn.j)) return; // une analyse par jour et par séance suffit
-  iaEnCours = true; id('iaRelancer').disabled = true;
-  id('iaEtat').textContent = '🧠 L’IA réfléchit… (jusqu’à une minute)';
-  try {
-    const r = await appelerIA('/analyse', { contexte: contexteIA() });
-    const a = lireAvisIA(r.avis);
-    if (!a) throw new Error('réponse de l’IA incomplète');
-    localStorage.setItem(CLE_IA, JSON.stringify({ avis: a, jour: aujourdhui(), heure: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }), seance: dernier(d.novn.j) }));
-    id('iaEtat').textContent = '';
-  } catch (e) {
-    id('iaEtat').textContent = 'L’IA n’a pas pu répondre : ' + e.message;
-  }
-  iaEnCours = false; id('iaRelancer').disabled = false;
-  sur(afficherAvisIA);
-}
-id('iaRelancer').onclick = () => analyserIA(true);
-id('iaDemander').onclick = async () => {
-  const q = id('iaQuestion').value.trim();
-  if (!q) { id('iaReponse').textContent = 'Écris ta question d’abord.'; return; }
-  if (!DANS_APPLI) { id('iaReponse').textContent = 'L’IA marche seulement dans l’appli, sur le téléphone.'; return; }
-  if (!etat.donnees || !etat.donnees.novn) { id('iaReponse').textContent = 'Attends que les cours soient chargés.'; return; }
-  id('iaDemander').disabled = true; id('iaReponse').textContent = '🧠 L’IA réfléchit…';
-  try { const r = await appelerIA('/question', { contexte: contexteIA(), question: q }); id('iaReponse').textContent = r.reponse; }
-  catch (e) { id('iaReponse').textContent = 'L’IA n’a pas pu répondre : ' + e.message; }
-  id('iaDemander').disabled = false;
-};
 
 // ---------- Mise à jour des cours ----------
 async function actualiser() {
@@ -1005,7 +972,6 @@ async function actualiser() {
   try { localStorage.setItem(CLE.donnees, JSON.stringify(d)); } catch (e) { }
   etat.enCours = false; id('actualiser').disabled = false;
   toutAfficher();
-  analyserIA(false);
 }
 
 // ---------- Boutons ----------
@@ -1066,7 +1032,6 @@ etat.donnees = lireJSON(CLE.donnees);
 remplirChamps();
 toutAfficher();
 if (DANS_APPLI && (!etat.donnees || Date.now() - (etat.donnees.quand || 0) > 10 * 60000)) actualiser();
-else analyserIA(false);
 
 // ===== CONTRÔLE QUALITÉ — NE JAMAIS MODIFIER UN CAS POUR LE FAIRE PASSER =====
 const normaliserEspaces = (s) => String(s).replace(/[\u202f\u00a0\u2009]/g, ' ');
@@ -1094,9 +1059,10 @@ function controleQualite() {
     ['Voyant : cours qui baisse tout le temps (349 → 100) → rouge, 1 sur 4', () => { const v = voyant(Array.from({ length: 250 }, (_, i) => 349 - i)); return v.couleur + ' ' + v.score; }, 'rouge 1'],
     ['Bulletin : vert puis 110, rouge puis 105, vert puis 120 → tout juste', () => { const b = bulletin([100, 110, 105, 120], ['vert', 'rouge', 'vert', null], 0, 1); return 'vert ' + b.vert.bons + '/' + b.vert.n + ' rouge ' + b.rouge.bons + '/' + b.rouge.n + ' hausses ' + b.tous.hausses + '/' + b.tous.n; }, 'vert 2/2 rouge 1/1 hausses 2/3'],
     ['Bulletin : feu vert suivi d’une baisse (100 → 90) → compté faux', () => { const b = bulletin([100, 90, 95], ['vert', 'vert', null], 0, 1); return b.vert.bons + '/' + b.vert.n; }, '1/2'],
-    ['Avis IA correct → feu vert gardé', () => lireAvisIA('{"couleur":"vert","titre":"Situation saine","conseil":"Garde tes parts.","pourquoi":["a"],"confiance":"moyenne"}').couleur, 'vert'],
-    ['Avis IA avec une couleur inconnue → orange par prudence', () => lireAvisIA('{"couleur":"violet","titre":"T","conseil":"C"}').couleur, 'orange'],
-    ['Réponse de l’IA qui n’est pas du JSON → ignorée', () => lireAvisIA('bonjour'), null],
+    ['Direction : cours qui monte (100 → 129) → plutôt hausse, 3 sur 4 (surchauffe)', () => { const v = directionCT(Array.from({ length: 30 }, (_, i) => 100 + i)); return v.couleur + ' ' + v.score; }, 'vert 3'],
+    ['Direction : cours qui baisse (129 → 100) → plutôt baisse, 1 sur 4', () => { const v = directionCT(Array.from({ length: 30 }, (_, i) => 129 - i)); return v.couleur + ' ' + v.score; }, 'rouge 1'],
+    ['Fourchette demain : VL 100 €, agitation 1 %/jour → 99,00 – 101,01 €', () => fourchetteVL(100, 0.01, 1).map((x) => formaterNombre(x)).join(' – '), '99,00 – 101,01'],
+    ['Fourchette à 5 jours : VL 100 €, agitation 1 %/jour → 97,79 – 102,26 €', () => fourchetteVL(100, 0.01, 5).map((x) => formaterNombre(x)).join(' – '), '97,79 – 102,26'],
   ];
   const ko = [];
   for (const [nom, f, attendu] of cas) {

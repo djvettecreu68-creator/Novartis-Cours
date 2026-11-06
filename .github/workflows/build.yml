@@ -401,7 +401,7 @@ jobs:
                   for (String cle : new String[]{"vlBas", "vlHaut", "nvsBas", "nvsHaut"})
                       if (avant.optDouble(cle, -1) != apres.optDouble(cle, -1)) e.remove("dit_" + cle);
                   if (avant.optDouble("variation", -1) != apres.optDouble("variation", -1)) e.remove("jour_novn").remove("jour_nvs");
-                  if (avant.optBoolean("voyant", false) != apres.optBoolean("voyant", false)) e.remove("voyant_couleur").remove("voyant_jour");
+                  if (avant.optBoolean("voyant", false) != apres.optBoolean("voyant", false)) e.remove("direction_couleur").remove("direction_jour");
                   e.apply();
                   planifier(c, apres.optBoolean("actif", false));
               }
@@ -552,43 +552,46 @@ jobs:
                   sp.edit().putString("jour_" + cle, s.jour()).apply();
               }
 
-              /** Le voyant : 4 vérifications sur l'action à Zurich, mêmes règles que l'écran. null si pas assez d'historique. */
+              /** Direction à court terme : 4 vérifications sur l'action à Zurich, mêmes règles que l'écran. null si pas assez d'historique. */
               static String couleurVoyant(ArrayList<Double> a) {
                   int n = a.size();
-                  if (n < 200) return null;
-                  double p = a.get(n - 1), m50 = 0, m200 = 0;
-                  for (int i = n - 50; i < n; i++) m50 += a.get(i);
-                  for (int i = n - 200; i < n; i++) m200 += a.get(i);
-                  m50 /= 50;
-                  m200 /= 200;
-                  int debut = Math.max(0, n - 250), k = 14;
+                  if (n < 25) return null;
+                  double p = a.get(n - 1), m10 = 0, m20 = 0;
+                  for (int i = n - 10; i < n; i++) m10 += a.get(i);
+                  for (int i = n - 20; i < n; i++) m20 += a.get(i);
+                  m10 /= 10;
+                  m20 /= 20;
+                  int debut = Math.max(0, n - 100), k = 14;
                   double g = 0, q = 0;
                   for (int i = debut + 1; i <= debut + k; i++) { double d = a.get(i) - a.get(i - 1); if (d > 0) g += d; else q -= d; }
                   g /= k;
                   q /= k;
                   for (int i = debut + k + 1; i < n; i++) { double d = a.get(i) - a.get(i - 1); g = (g * (k - 1) + (d > 0 ? d : 0)) / k; q = (q * (k - 1) + (d < 0 ? -d : 0)) / k; }
                   double rsi = q == 0 ? (g == 0 ? 50 : 100) : 100 - 100 / (1 + g / q);
-                  int score = (p > m200 ? 1 : 0) + (m50 > m200 ? 1 : 0) + (p > m50 ? 1 : 0) + (rsi < 70 ? 1 : 0);
+                  int score = (p > a.get(n - 6) ? 1 : 0) + (p > m10 ? 1 : 0) + (m10 > m20 ? 1 : 0) + (rsi < 70 ? 1 : 0);
                   return score >= 3 ? "vert" : (score == 2 ? "orange" : "rouge");
               }
 
-              /** Chaque soir après la clôture de Zurich (17h45) : prévient si le voyant change de couleur. */
+              /** Chaque soir après la clôture de Zurich (17h45) : prévient si la direction prévue change. */
               static void voyant(Context c, SharedPreferences sp, JSONObject cfg, java.time.ZonedDateTime m, int minutes, boolean force, StringBuilder bilan) throws Exception {
                   if (!cfg.optBoolean("voyant", false)) return;
                   String aujourdhui = m.toLocalDate().toString();
-                  if (!force && (minutes < 17 * 60 + 45 || aujourdhui.equals(sp.getString("voyant_jour", "")))) return;
+                  if (!force && (minutes < 17 * 60 + 45 || aujourdhui.equals(sp.getString("direction_jour", "")))) return;
                   String couleur = couleurVoyant(charger("NOVN.SW", "1y").a);
                   if (couleur == null) return;
-                  bilan.append(" · voyant ").append(couleur);
-                  String avant = sp.getString("voyant_couleur", "");
+                  String[] noms = {"vert", "plutôt hausse", "orange", "indécis", "rouge", "plutôt baisse"};
+                  String nom = couleur.equals("vert") ? noms[1] : (couleur.equals("orange") ? noms[3] : noms[5]);
+                  bilan.append(" · direction ").append(nom);
+                  String avant = sp.getString("direction_couleur", "");
                   if (!avant.isEmpty() && !avant.equals(couleur)) {
-                      String[] t = couleur.equals("vert") ? new String[]{"🟢 Novartis : feu vert", "Les vérifications sont bonnes : plutôt un bon moment pour acheter ou garder."}
-                              : couleur.equals("orange") ? new String[]{"🟠 Novartis : feu orange", "Signaux mélangés : plutôt attendre."}
-                              : new String[]{"🔴 Novartis : feu rouge", "Tendance défavorable : plutôt pas le moment d'acheter."};
-                      notifier(c, 107, t[0], t[1] + " (avant : feu " + avant + ")");
+                      String[] t = couleur.equals("vert") ? new String[]{"🟢 Novartis : plutôt hausse", "La plupart des indicateurs penchent vers la hausse."}
+                              : couleur.equals("orange") ? new String[]{"🟠 Novartis : indécis", "Les indicateurs se contredisent : plutôt attendre."}
+                              : new String[]{"🔴 Novartis : plutôt baisse", "La plupart des indicateurs penchent vers la baisse."};
+                      String nomAvant = avant.equals("vert") ? noms[1] : (avant.equals("orange") ? noms[3] : noms[5]);
+                      notifier(c, 107, t[0], t[1] + " (avant : " + nomAvant + ")");
                   }
-                  SharedPreferences.Editor e = sp.edit().putString("voyant_couleur", couleur);
-                  if (!force) e.putString("voyant_jour", aujourdhui);
+                  SharedPreferences.Editor e = sp.edit().putString("direction_couleur", couleur);
+                  if (!force) e.putString("direction_jour", aujourdhui);
                   e.apply();
               }
 
