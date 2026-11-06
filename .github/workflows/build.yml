@@ -487,7 +487,7 @@ jobs:
                   Double fxRef = null;
                   for (int i = 0; i < fx.t.size(); i++) { if (fx.t.get(i) <= novn.t.get(k) + 6 * 3600) fxRef = fx.c.get(i); else break; }
                   if (fxRef == null) return null;
-                  return vlRef * (novn.dernier() / fx.dernier()) / (novn.a.get(k) / fxRef);
+                  return vlRef * (novn.a.get(novn.a.size() - 1) / fx.dernier()) / (novn.a.get(k) / fxRef);
               }
 
               static boolean atteint(double valeur, double seuil, boolean bas) { return bas ? valeur <= seuil : valeur >= seuil; }
@@ -507,7 +507,7 @@ jobs:
                   String periode = "5d";
                   if (avecVL) {
                       long age = java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.parse(jourRef), java.time.LocalDate.now());
-                      periode = age <= 80 ? "3mo" : (age <= 350 ? "1y" : "2y");
+                      periode = age <= 80 ? "3mo" : (age <= 350 ? "1y" : "max");
                   }
                   StringBuilder bilan = new StringBuilder(heure());
                   Serie novn = charger("NOVN.SW", periode);

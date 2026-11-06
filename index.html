@@ -424,8 +424,8 @@ function prixEurAuJour(d, jourISO) {
 }
 function calculFCPE(d, vlRef, vlDate) {
   const prixRef = prixEurAuJour(d, vlDate);
-  if (!prixRef) return { erreur: 'La date de ta VL est plus ancienne que l’historique chargé (2 ans) : mets une VL plus récente.' };
-  const prix = chfVersEur(dernier(d.novn.c), dernier(d.eurchf.c));
+  if (!prixRef) return { erreur: 'La date de ta VL est plus ancienne que l’historique chargé (10 ans) : mets une VL plus récente.' };
+  const prix = chfVersEur(dernier(d.novn.a), dernier(d.eurchf.c));
   const vl = estimerVL(vlRef, prixRef, prix);
   return { vl, variationPct: (vl / vlRef - 1) * 100 };
 }
@@ -952,7 +952,7 @@ async function actualiser() {
   if (!DANS_APPLI) { maj(etatEntete()); return; }
   if (etat.enCours) return;
   etat.enCours = true; id('actualiser').disabled = true; maj(etatEntete());
-  const demandes = [['novn', 'NOVN.SW', '10y'], ['eurchf', 'EURCHF=X', '2y'], ['nvs', 'NVS', '10y'], ['eurusd', 'EURUSD=X', '5d']];
+  const demandes = [['novn', 'NOVN.SW', '10y'], ['eurchf', 'EURCHF=X', '10y'], ['nvs', 'NVS', '10y'], ['eurusd', 'EURUSD=X', '5d']];
   const [series, actus] = await Promise.all([Promise.allSettled(demandes.map(([, s, p]) => chargerSerie(s, p))),
     chargerActus().catch((e) => ({ liste: [], erreurs: ['actus : ' + ((e && e.message) || e)] }))]);
   const d = Object.assign({}, etat.donnees || {}); // une série en échec garde sa version précédente
