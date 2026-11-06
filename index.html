@@ -359,7 +359,7 @@ function normaliserYahoo(texte, symbole) {
 async function chargerSerie(symbole, periode) {
   const chemin = '/v8/finance/chart/' + symbole + '?range=' + periode + '&interval=1d&includePrePost=false&events=div%2Csplits';
   let r = await lire('https://query1.finance.yahoo.com' + chemin);
-  if (r.statut !== 200) { const r2 = await lire('https://query2.finance.yahoo.com' + chemin); if (r2.statut === 200 || !r.statut) r = r2; }
+  if (r.statut !== 200) { const r2 = await lire('https://query2.finance.yahoo.com' + chemin); if (r2.statut === 200 || !r2.statut) r = r2; }
   if (r.statut !== 200) {
     const e = new Error(symbole + ' : ' + (r.statut ? 'Yahoo a répondu ' + r.statut : 'pas de réponse (' + r.corps + ')'));
     e.reseau = !r.statut;

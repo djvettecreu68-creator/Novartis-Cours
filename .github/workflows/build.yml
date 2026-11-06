@@ -106,10 +106,6 @@ jobs:
                           <category android:name="android.intent.category.LAUNCHER" />
                       </intent-filter>
                   </activity>
-                  <service
-                      android:name=".VeilleJob"
-                      android:permission="android.permission.BIND_JOB_SERVICE"
-                      android:exported="false" />
                   <receiver
                       android:name=".WidgetNovartis"
                       android:exported="true">
@@ -120,6 +116,10 @@ jobs:
                           android:name="android.appwidget.provider"
                           android:resource="@xml/widget_info" />
                   </receiver>
+                  <service
+                      android:name=".VeilleJob"
+                      android:permission="android.permission.BIND_JOB_SERVICE"
+                      android:exported="false" />
               </application>
           </manifest>
           EOF_4
@@ -312,7 +312,7 @@ jobs:
 
                   @JavascriptInterface public void majWidget(String json) {
                       try {
-                          getSharedPreferences("widget", Context.MODE_PRIVATE).edit().putString("donnees", json).apply();
+                          getSharedPreferences("widget", android.content.Context.MODE_PRIVATE).edit().putString("donnees", json).apply();
                           WidgetNovartis.rafraichirTout(getApplicationContext());
                       } catch (Exception ignore) { }
                   }
@@ -573,37 +573,37 @@ jobs:
                   sp.edit().putString("jour_" + cle, s.jour()).apply();
               }
 
-                  /** Écrit dans le widget ce qu'il doit afficher : cours, variation, alertes déclenchées. */
-                  static void enregistrerWidget(Context c, Serie novn, Serie nvs, Double vl, JSONObject cfg) {
-                      try {
-                          StringBuilder l1 = new StringBuilder();
-                          Double varN = novn.variation();
-                          l1.append(varN == null ? "•" : (varN > 0 ? "📈" : (varN < 0 ? "📉" : "➖"))).append(" NOVN ").append(nombre(novn.dernier())).append(" CHF");
-                          if (varN != null) l1.append(" (").append(String.format(Locale.FRANCE, "%+.1f %%", varN)).append(")");
-                          StringBuilder l2 = new StringBuilder();
-                          Double varV = nvs.variation();
-                          l2.append(varV == null ? "•" : (varV > 0 ? "📈" : (varV < 0 ? "📉" : "➖"))).append(" NVS ").append(nombre(nvs.dernier())).append(" $");
-                          if (varV != null) l2.append(" (").append(String.format(Locale.FRANCE, "%+.1f %%", varV)).append(")");
-                          java.util.List<String> al = new java.util.ArrayList<>();
-                          if (vl != null) {
-                              if (cfg.optDouble("vlBas", 0) > 0 && vl <= cfg.optDouble("vlBas")) al.add("VL sous " + nombre(cfg.optDouble("vlBas")) + " €");
-                              if (cfg.optDouble("vlHaut", 0) > 0 && vl >= cfg.optDouble("vlHaut")) al.add("VL au-dessus de " + nombre(cfg.optDouble("vlHaut")) + " €");
-                          }
-                          if (cfg.optDouble("nvsBas", 0) > 0 && nvs.dernier() <= cfg.optDouble("nvsBas")) al.add("NVS sous " + nombre(cfg.optDouble("nvsBas")) + " $");
-                          if (cfg.optDouble("nvsHaut", 0) > 0 && nvs.dernier() >= cfg.optDouble("nvsHaut")) al.add("NVS au-dessus de " + nombre(cfg.optDouble("nvsHaut")) + " $");
-                          String alertes = al.size() > 2 ? "⚠️ " + al.size() + " alertes" : (al.isEmpty() ? "" : "⚠️ " + String.join(" · ", al));
-                          JSONObject w = new JSONObject();
-                          w.put("novn", l1.toString());
-                          w.put("nvs", l2.toString());
-                          w.put("alertes", alertes);
-                          w.put("quand", heure());
-                          c.getSharedPreferences("widget", Context.MODE_PRIVATE).edit().putString("donnees", w.toString()).apply();
-                          WidgetNovartis.rafraichirTout(c);
-                      } catch (Exception ignore) { }
-                  }
+              /** Écrit dans le widget ce qu'il doit afficher : cours, variation, alertes déclenchées. */
+              static void enregistrerWidget(Context c, Serie novn, Serie nvs, Double vl, JSONObject cfg) {
+                  try {
+                      StringBuilder l1 = new StringBuilder();
+                      Double varN = novn.variation();
+                      l1.append(varN == null ? "•" : (varN > 0 ? "📈" : (varN < 0 ? "📉" : "➖"))).append(" NOVN ").append(nombre(novn.dernier())).append(" CHF");
+                      if (varN != null) l1.append(" (").append(String.format(Locale.FRANCE, "%+.1f %%", varN)).append(")");
+                      StringBuilder l2 = new StringBuilder();
+                      Double varV = nvs.variation();
+                      l2.append(varV == null ? "•" : (varV > 0 ? "📈" : (varV < 0 ? "📉" : "➖"))).append(" NVS ").append(nombre(nvs.dernier())).append(" $");
+                      if (varV != null) l2.append(" (").append(String.format(Locale.FRANCE, "%+.1f %%", varV)).append(")");
+                      java.util.List<String> al = new java.util.ArrayList<>();
+                      if (vl != null) {
+                          if (cfg.optDouble("vlBas", 0) > 0 && vl <= cfg.optDouble("vlBas")) al.add("VL sous " + nombre(cfg.optDouble("vlBas")) + " €");
+                          if (cfg.optDouble("vlHaut", 0) > 0 && vl >= cfg.optDouble("vlHaut")) al.add("VL au-dessus de " + nombre(cfg.optDouble("vlHaut")) + " €");
+                      }
+                      if (cfg.optDouble("nvsBas", 0) > 0 && nvs.dernier() <= cfg.optDouble("nvsBas")) al.add("NVS sous " + nombre(cfg.optDouble("nvsBas")) + " $");
+                      if (cfg.optDouble("nvsHaut", 0) > 0 && nvs.dernier() >= cfg.optDouble("nvsHaut")) al.add("NVS au-dessus de " + nombre(cfg.optDouble("nvsHaut")) + " $");
+                      String alertes = al.size() > 2 ? "⚠️ " + al.size() + " alertes" : (al.isEmpty() ? "" : "⚠️ " + String.join(" · ", al));
+                      JSONObject w = new JSONObject();
+                      w.put("novn", l1.toString());
+                      w.put("nvs", l2.toString());
+                      w.put("alertes", alertes);
+                      w.put("quand", heure());
+                      c.getSharedPreferences("widget", android.content.Context.MODE_PRIVATE).edit().putString("donnees", w.toString()).apply();
+                      WidgetNovartis.rafraichirTout(c);
+                  } catch (Exception ignore) { }
+              }
 
-                  /** Direction à court terme : 4 vérifications sur l'action à Zurich, mêmes règles que l'écran. null si pas assez d'historique. */
-                  static String couleurVoyant(ArrayList<Double> a) {
+              /** Direction à court terme : 4 vérifications sur l'action à Zurich, mêmes règles que l'écran. null si pas assez d'historique. */
+              static String couleurVoyant(ArrayList<Double> a) {
                   int n = a.size();
                   if (n < 25) return null;
                   double p = a.get(n - 1), m10 = 0, m20 = 0;
