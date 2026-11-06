@@ -108,6 +108,7 @@ jobs:
                   </activity>
                   <receiver
                       android:name=".WidgetNovartis"
+                      android:label="Novartis Cours"
                       android:exported="true">
                       <intent-filter>
                           <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -731,6 +732,9 @@ jobs:
               android:minHeight="110dp"
               android:updatePeriodMillis="1800000"
               android:initialLayout="@layout/widget"
+              android:previewLayout="@layout/widget"
+              android:targetCellWidth="2"
+              android:targetCellHeight="2"
               android:resizeMode="horizontal|vertical"
               android:widgetCategory="home_screen" />
           EOF_11
