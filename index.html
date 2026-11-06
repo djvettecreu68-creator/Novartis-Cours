@@ -47,6 +47,7 @@ td small{display:block;color:var(--doux);font-size:.74rem}
 .boutons{display:flex;gap:10px;margin-top:12px}
 .boutons button{flex:1}
 button.secondaire{background:var(--bord);color:var(--txt)}
+[hidden]{display:none!important}
 </style>
 </head>
 <body>
@@ -62,17 +63,30 @@ button.secondaire{background:var(--bord);color:var(--txt)}
     <div class="gros" id="vlEstimee">— €</div>
     <div id="vlVariation" class="doux"></div>
     <div id="vlTotal" style="margin-top:6px"></div>
+    <button id="changerVL" class="secondaire" style="margin-top:12px;width:100%" hidden>Mettre à jour ma VL</button>
+    <div id="saisieVL">
     <div class="champs">
       <label>Date de ta dernière VL<input type="date" id="vlDate"></label>
       <label>VL de ce jour-là (€)<input type="text" inputmode="decimal" id="vlRef" placeholder="ex. 109,657"></label>
       <label class="plein">Nombre de parts (facultatif)<input type="text" inputmode="decimal" id="parts" placeholder="ex. 152,3846"></label>
     </div>
     <button id="enregistrerVL" style="margin-top:12px;width:100%">Enregistrer</button>
+    </div>
     <div id="vlMessage" class="note"></div>
     <div id="vlControle" class="note"></div>
-    <div class="note">Estimation = ta dernière VL × la variation de l’action Novartis à Zurich, convertie en euros (CHF → €), dividende compris. Elle n’est jamais exacte au centime (liquidités du fonds, frais, heure du calcul) : remets ta VL à jour dès que tu en as une nouvelle.</div>
+    <div class="note">Estimation d’après l’action Novartis à Zurich. Remets ta VL à jour quand Natixis en publie une nouvelle.</div>
   </section>
 
+  <section class="carte">
+    <div class="titre">Mon alerte</div>
+    <label class="doux" style="display:flex;flex-direction:column;gap:4px">Préviens-moi si ma VL passe sous (€)<input type="text" inputmode="decimal" id="simpleSeuil" placeholder="ex. 105"></label>
+    <button id="simpleEnregistrer" style="margin-top:12px;width:100%">Enregistrer</button>
+    <div id="simpleMessage" class="note"></div>
+    <div class="note">Laisse vide et Enregistrer pour enlever l’alerte. Ton téléphone sonne même appli fermée.</div>
+  </section>
+
+  <button id="voirDetails" class="secondaire large">Voir les détails</button>
+  <div id="details" class="grille large" hidden>
   <section class="carte">
     <div class="titre">L’action Novartis</div>
     <div class="ligne"><span>Zurich (NOVN)</span><b id="prixNovn">—</b></div>
@@ -131,6 +145,7 @@ button.secondaire{background:var(--bord);color:var(--txt)}
     <div class="titre">Actualités</div>
     <div id="actus" class="doux">—</div>
   </section>
+  </div>
 </div>
 
 <div id="controle"></div>
@@ -684,6 +699,41 @@ window.__alertesTestees = (r) => {
 remplirAlertes();
 envoyerAlertes();
 
+// ---------- Écran simple (1.3) : la valeur du FCPE, une alerte, le reste dans « Voir les détails » ----------
+function remplirSimple() {
+  const al = lireAlertes(), actif = al.actif && al.vlBas;
+  id('simpleSeuil').value = actif ? String(al.vlBas).replace('.', ',') : '';
+  id('simpleMessage').textContent = actif ? 'Alerte active : sous ' + formaterNombre(al.vlBas) + '\u00a0€.' : 'Pas d’alerte pour l’instant.';
+}
+id('simpleEnregistrer').onclick = () => {
+  const msg = (t) => { id('simpleMessage').textContent = t; };
+  const texte = id('simpleSeuil').value.trim(), v = texte === '' ? null : lireNombre(texte);
+  if (texte !== '' && (v == null || v <= 0)) return msg('Écris un nombre, par exemple 105');
+  const al = lireAlertes();
+  if (v && al.vlHaut && v >= al.vlHaut) return msg('Ce seuil doit être plus petit que ton alerte «\u00a0VL au-dessus\u00a0» (dans les détails).');
+  al.vlBas = v;
+  al.actif = CHAMPS_ALERTES.some(([cle]) => al[cle]);
+  localStorage.setItem(CLE_ALERTES, JSON.stringify(al));
+  envoyerAlertes();
+  remplirAlertes();
+  if (A && A.vibrer) A.vibrer(30);
+  msg(v ? 'C’est noté ✓ Ton téléphone sonnera si ta VL passe sous ' + formaterNombre(v) + '\u00a0€.' : 'Alerte enlevée.');
+  sur(afficherAlertes);
+};
+id('enregistrerAlertes').addEventListener('click', remplirSimple); // garde les deux cartes d’accord
+function montrerSaisieVL(oui) { id('saisieVL').hidden = !oui; id('changerVL').hidden = oui; }
+id('changerVL').onclick = () => montrerSaisieVL(true);
+function montrerDetails(oui) {
+  id('details').hidden = !oui;
+  id('voirDetails').textContent = oui ? 'Cacher les détails' : 'Voir les détails';
+  try { localStorage.setItem('novartis.details', oui ? '1' : '0'); } catch (e) { }
+  if (oui) sur(dessiner);
+}
+id('voirDetails').onclick = () => montrerDetails(id('details').hidden);
+remplirSimple();
+montrerSaisieVL(!(localStorage.getItem(CLE.vlRef) && localStorage.getItem(CLE.vlDate)));
+montrerDetails(localStorage.getItem('novartis.details') === '1');
+
 // ---------- Mise à jour des cours ----------
 async function actualiser() {
   if (!DANS_APPLI) { maj(etatEntete()); return; }
@@ -739,6 +789,7 @@ id('enregistrerVL').onclick = () => {
   sur(afficherFCPE);
   envoyerAlertes(); // la veille Android prend la nouvelle VL
   sur(afficherAlertes);
+  montrerSaisieVL(false);
 };
 id('actus').addEventListener('click', (e) => {
   const el = e.target.closest('[data-i]'), a = etat.donnees && etat.donnees.actus;
