@@ -69,9 +69,13 @@ button.secondaire{background:var(--bord);color:var(--txt)}
       <label>Date de ta dernière VL<input type="date" id="vlDate"></label>
       <label>VL de ce jour-là (€)<input type="text" inputmode="decimal" id="vlRef" placeholder="ex. 109,657"></label>
       <label class="plein">Nombre de parts (facultatif)<input type="text" inputmode="decimal" id="parts" placeholder="ex. 152,3846"></label>
-      <label class="plein">Prix de revient (VL d'achat en €)<input type="text" inputmode="decimal" id="vlAchat" placeholder="ex. 100"></label>
     </div>
-    <button id="enregistrerVL" style="margin-top:12px;width:100%">Enregistrer</button>
+    <button id="enregistrerVL" style="margin-top:12px;width:100%">Enregistrer la VL</button>
+    </div>
+    
+    <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--bord)">
+      <label class="doux" style="display:flex;flex-direction:column;gap:4px">Mon prix de revient à l'achat (€)<input type="text" inputmode="decimal" id="vlAchat" placeholder="ex. 100"></label>
+      <button id="enregistrerAchat" class="secondaire" style="margin-top:8px;width:100%">Enregistrer l'achat</button>
     </div>
     <div id="vlMessage" class="note"></div>
     <div id="vlControle" class="note"></div>
@@ -1047,8 +1051,6 @@ id('enregistrerVL').onclick = () => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(jour)) return msg('Choisis la date de cette VL.');
   if (jour > aujourdhui()) return msg('La date de la VL ne peut pas être dans le futur.');
   if (texteParts !== '' && (p == null || p < 0)) return msg('Nombre de parts invalide : écris par exemple 152,3846');
-  const vlAchat = lireNombre(id('vlAchat').value);
-  if (id('vlAchat').value.trim() !== '' && (vlAchat == null || vlAchat <= 0)) return msg('Prix de revient invalide : écris par exemple 100');
   // contrôle : ce que l’appli avait estimé pour cette nouvelle date, à partir de l’ancienne VL
   const ancienneV = lireNombre(localStorage.getItem(CLE.vlRef)), ancienneD = localStorage.getItem(CLE.vlDate), d = etat.donnees;
   if (ancienneV && ancienneD && jour > ancienneD && d && d.novn && d.eurchf) {
@@ -1061,7 +1063,6 @@ id('enregistrerVL').onclick = () => {
   localStorage.setItem(CLE.vlRef, String(v));
   localStorage.setItem(CLE.vlDate, jour);
   if (p == null) localStorage.removeItem(CLE.parts); else localStorage.setItem(CLE.parts, String(p));
-  if (vlAchat == null) localStorage.removeItem(CLE.vlAchat); else localStorage.setItem(CLE.vlAchat, String(vlAchat));
   if (A && A.vibrer) A.vibrer(30);
   msg('Enregistré ✓');
   remplirChamps();
@@ -1070,6 +1071,17 @@ id('enregistrerVL').onclick = () => {
   sur(afficherAlertes);
   montrerSaisieVL(false);
 };
+id('enregistrerAchat').onclick = () => {
+  const texte = id('vlAchat').value.trim();
+  const v = texte === '' ? null : lireNombre(texte);
+  if (texte !== '' && (v == null || v <= 0)) { id('vlMessage').textContent = 'Prix de revient invalide : écris par exemple 100'; return; }
+  if (v == null) localStorage.removeItem(CLE.vlAchat); else localStorage.setItem(CLE.vlAchat, String(v));
+  if (A && A.vibrer) A.vibrer(30);
+  id('vlMessage').textContent = v ? 'Prix de revient enregistré ✓' : 'Prix de revient enlevé ✓';
+  sur(afficherFCPE);
+  envoyerAlertes();
+};
+
 id('actus').addEventListener('click', (e) => {
   const el = e.target.closest('[data-i]'), a = etat.donnees && etat.donnees.actus;
   const x = el && a && a.liste[+el.dataset.i];
