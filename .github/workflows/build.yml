@@ -637,7 +637,7 @@ jobs:
                       w.put("vl", vlTxt); w.put("var", varTxt); w.put("varCls", varCls);
                       w.put("alerte", alTxt); w.put("dirTitre", dirTitre); w.put("dirTexte", dirTexte);
                       w.put("f1", f1); w.put("f5", f5); w.put("c1", c1); w.put("c2", c2); w.put("c3", c3); w.put("c4", c4);
-                      w.put("quand", heure());
+                      w.put("quand", heure() + " · Toucher pour actualiser");
                       c.getSharedPreferences("widget", android.content.Context.MODE_PRIVATE).edit().putString("donnees", w.toString()).apply();
                       WidgetNovartis.rafraichirTout(c);
                   } catch (Exception ignore) { }
@@ -876,8 +876,28 @@ jobs:
           import android.widget.RemoteViews;
           import org.json.JSONObject;
 
-          /** Widget d'écran d'accueil : VL, prévision complète, fourchettes et indicateurs. Lit SharedPreferences("widget"). */
+          /** Widget d'écran d'accueil : VL, prévision complète, fourchettes et indicateurs. */
           public class WidgetNovartis extends AppWidgetProvider {
+              static final String ACTION_ACTUALISER = "fr.hack68.novartis.ACTUALISER_WIDGET";
+
+              @Override
+              public void onReceive(Context c, Intent i) {
+                  super.onReceive(c, i);
+                  if (ACTION_ACTUALISER.equals(i.getAction())) {
+                      RemoteViews v = construire(c);
+                      v.setTextViewText(R.id.w_quand, "Actualisation en cours…");
+                      AppWidgetManager m = AppWidgetManager.getInstance(c);
+                      int[] ids = m.getAppWidgetIds(new ComponentName(c, WidgetNovartis.class));
+                      for (int id : ids) m.updateAppWidget(id, v);
+
+                      new Thread(() -> {
+                          try { VeilleJob.verifier(c.getApplicationContext(), true); }
+                          catch (Exception e) { }
+                          rafraichirTout(c);
+                      }).start();
+                  }
+              }
+
               @Override public void onUpdate(Context c, AppWidgetManager m, int[] ids) {
                   for (int id : ids) m.updateAppWidget(id, construire(c));
               }
@@ -944,9 +964,11 @@ jobs:
                       v.setTextViewText(R.id.w_c4, "");
                       v.setTextViewText(R.id.w_quand, "");
                   }
-                  Intent i = new Intent(c, MainActivity.class);
-                  i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                  PendingIntent pi = PendingIntent.getActivity(c, 0, i, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+                  
+                  Intent i = new Intent(c, WidgetNovartis.class);
+                  i.setAction(ACTION_ACTUALISER);
+                  PendingIntent pi = PendingIntent.getBroadcast(c, 0, i, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+                  
                   v.setOnClickPendingIntent(R.id.w_titre, pi);
                   v.setOnClickPendingIntent(R.id.w_vl, pi);
                   v.setOnClickPendingIntent(R.id.w_var, pi);
