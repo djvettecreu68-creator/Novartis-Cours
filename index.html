@@ -661,19 +661,32 @@ function majWidgetAppli() {
       varCls = r.variationPct > 0 ? 'vert' : (r.variationPct < 0 ? 'rouge' : 'doux');
     }
     
-    let dirTxt = '';
-    if (v) dirTxt = TEXTES_CT[v.couleur][0];
-    
-    let fourchette = '';
+    const al = lireAlertes();
+    let alTxt = '';
+    if (al.actif && al.vlBas) alTxt = 'Alerte : sous ' + formaterNombre(al.vlBas) + ' €';
+
+    let dirTitre = '', dirTexte = '', c1 = '', c2 = '', c3 = '', c4 = '';
+    if (v) {
+      dirTitre = TEXTES_CT[v.couleur][0];
+      dirTexte = TEXTES_CT[v.couleur][1] + ' (' + v.score + ' sur 4)';
+      c1 = (v.checks[0] ? '✅' : '❌') + ' En hausse sur 5 jours';
+      c2 = (v.checks[1] ? '✅' : '❌') + ' Au-dessus de sa moyenne 10j';
+      c3 = (v.checks[2] ? '✅' : '❌') + ' Moyenne 10j > 20j';
+      c4 = (v.checks[3] ? '✅' : '❌') + ' Pas en surchauffe (RSI ' + formaterNombre(v.rsi, 0) + ')';
+    }
+
+    let f1 = '', f5 = '';
     if (r && !r.erreur && d.novn) {
        const sig = volJour(d.novn.a);
        if (sig) {
-         const f1 = fourchetteVL(r.vl, sig, 1);
-         fourchette = 'Demain : ' + formaterNombre(f1[0]) + ' – ' + formaterNombre(f1[1]) + ' €';
+         const fDemain = fourchetteVL(r.vl, sig, 1);
+         const f5j = fourchetteVL(r.vl, sig, 5);
+         f1 = 'Demain : ' + formaterNombre(fDemain[0]) + ' – ' + formaterNombre(fDemain[1]) + ' €';
+         f5 = 'Dans 5 jours : ' + formaterNombre(f5j[0]) + ' – ' + formaterNombre(f5j[1]) + ' €';
        }
     }
     
-    A.majWidget(JSON.stringify({ vl: vlTxt, var: varTxt, varCls: varCls, dir: dirTxt, fourchette: fourchette, quand: d.quand ? quand(d.quand) : '' }));
+    A.majWidget(JSON.stringify({ vl: vlTxt, var: varTxt, varCls: varCls, alerte: alTxt, dirTitre: dirTitre, dirTexte: dirTexte, f1: f1, f5: f5, c1: c1, c2: c2, c3: c3, c4: c4, quand: d.quand ? quand(d.quand) : '' }));
   } catch (e) { console.error('Widget : ' + ((e && e.stack) || e)); }
 }
 

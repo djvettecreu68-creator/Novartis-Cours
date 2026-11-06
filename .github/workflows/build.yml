@@ -574,10 +574,10 @@ jobs:
                   sp.edit().putString("jour_" + cle, s.jour()).apply();
               }
 
-              /** Écrit dans le widget ce qu'il doit afficher : VL, direction, fourchette. */
+              /** Écrit dans le widget ce qu'il doit afficher : VL, direction, fourchettes, indicateurs. */
               static void enregistrerWidget(Context c, Serie novn, Serie nvs, Double vl, JSONObject cfg) {
                   try {
-                      String vlTxt = "— €", varTxt = "", varCls = "doux", dirTxt = "", fourchette = "";
+                      String vlTxt = "— €", varTxt = "", varCls = "doux", alTxt = "", dirTitre = "", dirTexte = "", c1 = "", c2 = "", c3 = "", c4 = "", f1 = "", f5 = "";
                       if (vl != null) {
                           vlTxt = nombre(vl) + " €";
                           double vRef = cfg.optDouble("vlRef", 0);
@@ -587,27 +587,56 @@ jobs:
                               varCls = var > 0 ? "vert" : (var < 0 ? "rouge" : "doux");
                           }
                       }
-                      String cVoy = couleurVoyant(novn.a);
-                      if (cVoy != null) {
-                          dirTxt = cVoy.equals("vert") ? "🟢 Plutôt hausse" : (cVoy.equals("orange") ? "🟠 Indécis" : "🔴 Plutôt baisse");
+                      
+                      double vlBas = cfg.optDouble("vlBas", 0);
+                      if (cfg.optBoolean("actif", false) && vlBas > 0) alTxt = "Alerte : sous " + nombre(vlBas) + " €";
+
+                      int n = novn.a.size();
+                      if (n >= 25) {
+                          double p = novn.a.get(n - 1), m10 = 0, m20 = 0;
+                          for (int i = n - 10; i < n; i++) m10 += novn.a.get(i);
+                          for (int i = n - 20; i < n; i++) m20 += novn.a.get(i);
+                          m10 /= 10;
+                          m20 /= 20;
+                          int debut = Math.max(0, n - 100), k = 14;
+                          double g = 0, q = 0;
+                          for (int i = debut + 1; i <= debut + k; i++) { double d = novn.a.get(i) - novn.a.get(i - 1); if (d > 0) g += d; else q -= d; }
+                          g /= k; q /= k;
+                          for (int i = debut + k + 1; i < n; i++) { double d = novn.a.get(i) - novn.a.get(i - 1); g = (g * (k - 1) + (d > 0 ? d : 0)) / k; q = (q * (k - 1) + (d < 0 ? -d : 0)) / k; }
+                          double rsi = q == 0 ? (g == 0 ? 50 : 100) : 100 - 100 / (1 + g / q);
+
+                          boolean chk1 = p > novn.a.get(n - 6);
+                          boolean chk2 = p > m10;
+                          boolean chk3 = m10 > m20;
+                          boolean chk4 = rsi < 70;
+                          int score = (chk1 ? 1 : 0) + (chk2 ? 1 : 0) + (chk3 ? 1 : 0) + (chk4 ? 1 : 0);
+
+                          String coul = score >= 3 ? "vert" : (score == 2 ? "orange" : "rouge");
+                          dirTitre = coul.equals("vert") ? "🟢 Plutôt hausse" : (coul.equals("orange") ? "🟠 Indécis" : "🔴 Plutôt baisse");
+                          String desc = coul.equals("vert") ? "La plupart des indicateurs penchent vers la hausse." : (coul.equals("orange") ? "Les indicateurs se contredisent : plutôt attendre." : "La plupart des indicateurs penchent vers la baisse.");
+                          dirTexte = desc + " (" + score + " sur 4)";
+
+                          c1 = (chk1 ? "✅" : "❌") + " En hausse sur 5 jours";
+                          c2 = (chk2 ? "✅" : "❌") + " Au-dessus de sa moyenne 10j";
+                          c3 = (chk3 ? "✅" : "❌") + " Moyenne 10j > 20j";
+                          c4 = (chk4 ? "✅" : "❌") + " Pas en surchauffe (RSI " + Math.round(rsi) + ")";
                       }
-                      if (vl != null && novn.a.size() > 1) {
-                          int n = novn.a.size(), debut = Math.max(1, n - 61);
+
+                      if (vl != null && n > 1) {
+                          int debut = Math.max(1, n - 61);
                           double m = 0, s = 0;
                           for (int i = debut; i < n; i++) m += Math.log(novn.a.get(i) / novn.a.get(i - 1));
                           m /= (n - debut);
                           for (int i = debut; i < n; i++) { double d = Math.log(novn.a.get(i) / novn.a.get(i - 1)) - m; s += d * d; }
                           double sig = Math.sqrt(s / Math.max(1, n - debut - 1));
-                          double min = vl * Math.exp(-sig), max = vl * Math.exp(sig);
-                          fourchette = "Demain : " + nombre(min) + " – " + nombre(max) + " €";
+                          f1 = "Demain : " + nombre(vl * Math.exp(-sig)) + " – " + nombre(vl * Math.exp(sig)) + " €";
+                          f5 = "Dans 5 jours : " + nombre(vl * Math.exp(-sig * Math.sqrt(5))) + " – " + nombre(vl * Math.exp(sig * Math.sqrt(5))) + " €";
                       }
 
                       JSONObject w = new JSONObject();
-                      w.put("vl", vlTxt);
-                      w.put("var", varTxt);
-                      w.put("varCls", varCls);
-                      w.put("dir", dirTxt);
-                      w.put("fourchette", fourchette);
+                      w.put("vl", vlTxt); w.put("var", varTxt); w.put("varCls", varCls);
+                      w.put("alerte", alTxt); w.put("dirTitre", dirTitre); w.put("dirTexte", dirTexte);
+                      w.put("f1", f1); w.put("f5", f5); w.put("c1", c1); w.put("c2", c2); w.put("c3", c3); w.put("c4", c4);
                       w.put("quand", heure());
                       c.getSharedPreferences("widget", android.content.Context.MODE_PRIVATE).edit().putString("donnees", w.toString()).apply();
                       WidgetNovartis.rafraichirTout(c);
@@ -691,55 +720,115 @@ jobs:
               android:layout_width="match_parent"
               android:layout_height="match_parent"
               android:orientation="vertical"
-              android:padding="10dp"
+              android:padding="8dp"
               android:background="@drawable/widget_fond">
+
               <TextView
                   android:id="@+id/w_titre"
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
                   android:text="Mon FCPE Novartis"
                   android:textColor="#FFFFFF"
-                  android:textSize="12sp"
+                  android:textSize="11sp"
                   android:textStyle="bold" />
+
               <LinearLayout
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
                   android:orientation="horizontal"
-                  android:gravity="center_vertical"
-                  android:layout_marginTop="4dp">
+                  android:gravity="center_vertical">
                   <TextView
                       android:id="@+id/w_vl"
                       android:layout_width="wrap_content"
                       android:layout_height="wrap_content"
                       android:text="109,84 €"
                       android:textColor="#FFFFFF"
-                      android:textSize="22sp"
+                      android:textSize="18sp"
                       android:textStyle="bold" />
                   <TextView
                       android:id="@+id/w_var"
                       android:layout_width="wrap_content"
                       android:layout_height="wrap_content"
-                      android:layout_marginStart="8dp"
+                      android:layout_marginStart="6dp"
                       android:text="-1,99 %"
                       android:textColor="#EF7468"
-                      android:textSize="14sp"
+                      android:textSize="13sp"
                       android:textStyle="bold" />
               </LinearLayout>
+
               <TextView
-                  android:id="@+id/w_dir"
+                  android:id="@+id/w_alerte"
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
-                  android:layout_marginTop="2dp"
+                  android:text=""
+                  android:textColor="#FFD54F"
+                  android:textSize="11sp" />
+
+              <TextView
+                  android:id="@+id/w_dirTitre"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
                   android:text="🟠 Indécis"
                   android:textColor="#FFFFFF"
-                  android:textSize="13sp" />
+                  android:textSize="13sp"
+                  android:textStyle="bold" />
+
               <TextView
-                  android:id="@+id/w_fourchette"
+                  android:id="@+id/w_dirTexte"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:text="Les indicateurs se contredisent : plutôt attendre. (2 sur 4)"
+                  android:textColor="#E0FFFFFF"
+                  android:textSize="11sp" />
+
+              <TextView
+                  android:id="@+id/w_f1"
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
                   android:text="Demain : 107,53 – 112,20 €"
                   android:textColor="#E0FFFFFF"
-                  android:textSize="12sp" />
+                  android:textSize="11sp" />
+
+              <TextView
+                  android:id="@+id/w_f5"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:text="Dans 5 jours : 104,74 – 115,18 €"
+                  android:textColor="#E0FFFFFF"
+                  android:textSize="11sp" />
+
+              <TextView
+                  android:id="@+id/w_c1"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:text="❌ En hausse sur 5 jours"
+                  android:textColor="#E0FFFFFF"
+                  android:textSize="10sp" />
+
+              <TextView
+                  android:id="@+id/w_c2"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:text="❌ Au-dessus de sa moyenne 10j"
+                  android:textColor="#E0FFFFFF"
+                  android:textSize="10sp" />
+
+              <TextView
+                  android:id="@+id/w_c3"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:text="✅ Moyenne 10j > 20j"
+                  android:textColor="#E0FFFFFF"
+                  android:textSize="10sp" />
+
+              <TextView
+                  android:id="@+id/w_c4"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:text="✅ Pas en surchauffe (RSI 60)"
+                  android:textColor="#E0FFFFFF"
+                  android:textSize="10sp" />
+
               <TextView
                   android:id="@+id/w_quand"
                   android:layout_width="match_parent"
@@ -747,7 +836,7 @@ jobs:
                   android:gravity="end"
                   android:text=""
                   android:textColor="#80FFFFFF"
-                  android:textSize="10sp" />
+                  android:textSize="9sp" />
           </LinearLayout>
           EOF_10
           mkdir -p "$(dirname "app/src/main/res/xml/widget_info.xml")"
@@ -755,12 +844,12 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
               android:minWidth="250dp"
-              android:minHeight="110dp"
+              android:minHeight="180dp"
               android:updatePeriodMillis="1800000"
               android:initialLayout="@layout/widget"
               android:previewLayout="@layout/widget"
-              android:targetCellWidth="2"
-              android:targetCellHeight="2"
+              android:targetCellWidth="4"
+              android:targetCellHeight="3"
               android:resizeMode="horizontal|vertical"
               android:widgetCategory="home_screen" />
           EOF_11
@@ -787,7 +876,7 @@ jobs:
           import android.widget.RemoteViews;
           import org.json.JSONObject;
 
-          /** Widget d'écran d'accueil : cours Novartis, variation et alertes. Lit SharedPreferences("widget"). */
+          /** Widget d'écran d'accueil : VL, prévision complète, fourchettes et indicateurs. Lit SharedPreferences("widget"). */
           public class WidgetNovartis extends AppWidgetProvider {
               @Override public void onUpdate(Context c, AppWidgetManager m, int[] ids) {
                   for (int id : ids) m.updateAppWidget(id, construire(c));
@@ -811,8 +900,15 @@ jobs:
                       if (brut.isEmpty()) {
                           v.setTextViewText(R.id.w_vl, "Ouvre l'appli");
                           v.setTextViewText(R.id.w_var, "");
-                          v.setTextViewText(R.id.w_dir, "");
-                          v.setTextViewText(R.id.w_fourchette, "pour voir les cours");
+                          v.setTextViewText(R.id.w_alerte, "");
+                          v.setTextViewText(R.id.w_dirTitre, "");
+                          v.setTextViewText(R.id.w_dirTexte, "pour voir les cours");
+                          v.setTextViewText(R.id.w_f1, "");
+                          v.setTextViewText(R.id.w_f5, "");
+                          v.setTextViewText(R.id.w_c1, "");
+                          v.setTextViewText(R.id.w_c2, "");
+                          v.setTextViewText(R.id.w_c3, "");
+                          v.setTextViewText(R.id.w_c4, "");
                           v.setTextViewText(R.id.w_quand, "");
                       } else {
                           JSONObject d = new JSONObject(brut);
@@ -823,15 +919,29 @@ jobs:
                           else if (cls.equals("rouge")) v.setTextColor(R.id.w_var, android.graphics.Color.parseColor("#EF7468"));
                           else v.setTextColor(R.id.w_var, android.graphics.Color.parseColor("#9AA7B2"));
                           
-                          v.setTextViewText(R.id.w_dir, d.optString("dir", ""));
-                          v.setTextViewText(R.id.w_fourchette, d.optString("fourchette", ""));
+                          v.setTextViewText(R.id.w_alerte, d.optString("alerte", ""));
+                          v.setTextViewText(R.id.w_dirTitre, d.optString("dirTitre", ""));
+                          v.setTextViewText(R.id.w_dirTexte, d.optString("dirTexte", ""));
+                          v.setTextViewText(R.id.w_f1, d.optString("f1", ""));
+                          v.setTextViewText(R.id.w_f5, d.optString("f5", ""));
+                          v.setTextViewText(R.id.w_c1, d.optString("c1", ""));
+                          v.setTextViewText(R.id.w_c2, d.optString("c2", ""));
+                          v.setTextViewText(R.id.w_c3, d.optString("c3", ""));
+                          v.setTextViewText(R.id.w_c4, d.optString("c4", ""));
                           v.setTextViewText(R.id.w_quand, d.optString("quand", ""));
                       }
                   } catch (Exception e) {
                       v.setTextViewText(R.id.w_vl, "Erreur widget");
                       v.setTextViewText(R.id.w_var, "");
-                      v.setTextViewText(R.id.w_dir, "");
-                      v.setTextViewText(R.id.w_fourchette, "");
+                      v.setTextViewText(R.id.w_alerte, "");
+                      v.setTextViewText(R.id.w_dirTitre, "");
+                      v.setTextViewText(R.id.w_dirTexte, "");
+                      v.setTextViewText(R.id.w_f1, "");
+                      v.setTextViewText(R.id.w_f5, "");
+                      v.setTextViewText(R.id.w_c1, "");
+                      v.setTextViewText(R.id.w_c2, "");
+                      v.setTextViewText(R.id.w_c3, "");
+                      v.setTextViewText(R.id.w_c4, "");
                       v.setTextViewText(R.id.w_quand, "");
                   }
                   Intent i = new Intent(c, MainActivity.class);
@@ -840,8 +950,15 @@ jobs:
                   v.setOnClickPendingIntent(R.id.w_titre, pi);
                   v.setOnClickPendingIntent(R.id.w_vl, pi);
                   v.setOnClickPendingIntent(R.id.w_var, pi);
-                  v.setOnClickPendingIntent(R.id.w_dir, pi);
-                  v.setOnClickPendingIntent(R.id.w_fourchette, pi);
+                  v.setOnClickPendingIntent(R.id.w_alerte, pi);
+                  v.setOnClickPendingIntent(R.id.w_dirTitre, pi);
+                  v.setOnClickPendingIntent(R.id.w_dirTexte, pi);
+                  v.setOnClickPendingIntent(R.id.w_f1, pi);
+                  v.setOnClickPendingIntent(R.id.w_f5, pi);
+                  v.setOnClickPendingIntent(R.id.w_c1, pi);
+                  v.setOnClickPendingIntent(R.id.w_c2, pi);
+                  v.setOnClickPendingIntent(R.id.w_c3, pi);
+                  v.setOnClickPendingIntent(R.id.w_c4, pi);
                   return v;
               }
           }
