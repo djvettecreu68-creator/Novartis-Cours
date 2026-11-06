@@ -652,21 +652,30 @@ function majWidgetAppli() {
     const d = etat.donnees || {};
     if (!d.novn) { A.majWidget(JSON.stringify({ novn: 'Ouvre Novartis Cours', nvs: 'pour voir les cours', alertes: '', quand: '' })); return; }
     const fmt = (v) => formaterNombre(v).replace(/[\u00a0\u202f]/g, ' ');
-    const vTxt = (s) => { const x = variationJour(s); return x == null ? '' : ' (' + pct(x) + ')'; };
-    const fleche = (s) => { const x = variationJour(s); return x == null ? '•' : (x > 0 ? '📈' : (x < 0 ? '📉' : '➖')); };
-    const novn = fleche(d.novn) + ' NOVN ' + fmt(dernier(d.novn.c)) + ' CHF' + vTxt(d.novn);
-    const nvs = d.nvs ? fleche(d.nvs) + ' NVS ' + fmt(dernier(d.nvs.c)) + ' $' + vTxt(d.nvs) : '';
     const al = lireAlertes(), deja = [];
     const vlRef = lireNombre(localStorage.getItem(CLE.vlRef)), vlDate = localStorage.getItem(CLE.vlDate);
     const r = vlRef && vlDate && d.novn && d.eurchf ? calculFCPE(d, vlRef, vlDate) : null;
-    const vl = r && !r.erreur ? r.vl : null, nvsP = d.nvs ? dernier(d.nvs.c) : null;
+    const vl = r && !r.erreur ? r.vl : null, vp = r && !r.erreur ? r.variationPct : null;
+    const dir = d.novn ? directionCT(d.novn.a) : null;
+    
+    // Ligne 1 : La VL estimée avec sa variation
+    const fleche = (p) => p > 0 ? '📈' : (p < 0 ? '📉' : '➖');
+    const l1 = vl != null ? fleche(vp) + ' VL ' + fmt(vl) + ' € (' + pct(vp, 2) + ')' : '⚙️ VL à configurer';
+    
+    // Ligne 2 : La direction court terme (Prévision)
+    const l2 = dir ? TEXTES_CT[dir.couleur][0] : '';
+
+    // Ligne 3 : Les cours (ou l'alerte si déclenchée)
+    let l3 = d.novn ? 'NOVN ' + fmt(dernier(d.novn.c)) + ' CHF · NVS ' + (d.nvs ? fmt(dernier(d.nvs.c)) + ' $' : '') : '';
+    const nvsP = d.nvs ? dernier(d.nvs.c) : null;
     if (vl != null && al.vlBas && seuilAtteint(vl, al.vlBas, true)) deja.push('VL sous ' + fmt(al.vlBas) + ' €');
     if (vl != null && al.vlHaut && seuilAtteint(vl, al.vlHaut, false)) deja.push('VL au-dessus de ' + fmt(al.vlHaut) + ' €');
     if (nvsP != null && al.nvsBas && seuilAtteint(nvsP, al.nvsBas, true)) deja.push('NVS sous ' + fmt(al.nvsBas) + ' $');
     if (nvsP != null && al.nvsHaut && seuilAtteint(nvsP, al.nvsHaut, false)) deja.push('NVS au-dessus de ' + fmt(al.nvsHaut) + ' $');
     if (al.variation && [d.novn, d.nvs].some((s) => s && variationJour(s) != null && mouvementAlerte(variationJour(s), al.variation))) deja.push('mouvement ±' + fmt(al.variation) + ' %');
-    const alertes = deja.length > 2 ? '⚠️ ' + deja.length + ' alertes' : deja.map((x) => '⚠️ ' + x).join(' · ');
-    A.majWidget(JSON.stringify({ novn, nvs, alertes, quand: d.quand ? quand(d.quand) : '' }));
+    if (deja.length > 0) l3 = deja.length > 2 ? '⚠️ ' + deja.length + ' alertes' : deja.map((x) => '⚠️ ' + x).join(' · ');
+    
+    A.majWidget(JSON.stringify({ novn: l1, nvs: l2, alertes: l3, quand: d.quand ? quand(d.quand) : '' }));
   } catch (e) { console.error('Widget : ' + ((e && e.stack) || e)); }
 }
 

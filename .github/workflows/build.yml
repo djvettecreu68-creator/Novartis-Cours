@@ -574,17 +574,26 @@ jobs:
                   sp.edit().putString("jour_" + cle, s.jour()).apply();
               }
 
-              /** Écrit dans le widget ce qu'il doit afficher : cours, variation, alertes déclenchées. */
+              /** Écrit dans le widget ce qu'il doit afficher : VL, direction, alertes ou cours. */
               static void enregistrerWidget(Context c, Serie novn, Serie nvs, Double vl, JSONObject cfg) {
                   try {
+                      // Ligne 1 : La VL estimée avec sa variation
                       StringBuilder l1 = new StringBuilder();
-                      Double varN = novn.variation();
-                      l1.append(varN == null ? "•" : (varN > 0 ? "📈" : (varN < 0 ? "📉" : "➖"))).append(" NOVN ").append(nombre(novn.dernier())).append(" CHF");
-                      if (varN != null) l1.append(" (").append(String.format(Locale.FRANCE, "%+.1f %%", varN)).append(")");
+                      if (vl != null) {
+                          double var = cfg.optDouble("vlRef", 0) > 0 ? (vl / cfg.optDouble("vlRef") - 1) * 100 : 0;
+                          l1.append(var > 0 ? "📈" : (var < 0 ? "📉" : "➖")).append(" VL ").append(nombre(vl)).append(" € (").append(String.format(Locale.FRANCE, "%+.2f %%", var)).append(")");
+                      } else {
+                          l1.append("⚙️ VL à configurer");
+                      }
+
+                      // Ligne 2 : La direction court terme (Prévision)
                       StringBuilder l2 = new StringBuilder();
-                      Double varV = nvs.variation();
-                      l2.append(varV == null ? "•" : (varV > 0 ? "📈" : (varV < 0 ? "📉" : "➖"))).append(" NVS ").append(nombre(nvs.dernier())).append(" $");
-                      if (varV != null) l2.append(" (").append(String.format(Locale.FRANCE, "%+.1f %%", varV)).append(")");
+                      String cVoy = couleurVoyant(novn.a);
+                      if (cVoy != null) {
+                          l2.append(cVoy.equals("vert") ? "🟢 Plutôt hausse" : (cVoy.equals("orange") ? "🟠 Indécis" : "🔴 Plutôt baisse"));
+                      }
+
+                      // Ligne 3 : Les cours (ou l'alerte si déclenchée)
                       java.util.List<String> al = new java.util.ArrayList<>();
                       if (vl != null) {
                           if (cfg.optDouble("vlBas", 0) > 0 && vl <= cfg.optDouble("vlBas")) al.add("VL sous " + nombre(cfg.optDouble("vlBas")) + " €");
@@ -592,7 +601,14 @@ jobs:
                       }
                       if (cfg.optDouble("nvsBas", 0) > 0 && nvs.dernier() <= cfg.optDouble("nvsBas")) al.add("NVS sous " + nombre(cfg.optDouble("nvsBas")) + " $");
                       if (cfg.optDouble("nvsHaut", 0) > 0 && nvs.dernier() >= cfg.optDouble("nvsHaut")) al.add("NVS au-dessus de " + nombre(cfg.optDouble("nvsHaut")) + " $");
-                      String alertes = al.size() > 2 ? "⚠️ " + al.size() + " alertes" : (al.isEmpty() ? "" : "⚠️ " + String.join(" · ", al));
+                      
+                      String alertes = "";
+                      if (!al.isEmpty()) {
+                          alertes = al.size() > 2 ? "⚠️ " + al.size() + " alertes" : "⚠️ " + String.join(" · ", al);
+                      } else {
+                          alertes = "NOVN " + nombre(novn.dernier()) + " CHF · NVS " + nombre(nvs.dernier()) + " $";
+                      }
+
                       JSONObject w = new JSONObject();
                       w.put("novn", l1.toString());
                       w.put("nvs", l2.toString());
