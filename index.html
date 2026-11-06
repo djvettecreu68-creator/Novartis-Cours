@@ -83,6 +83,7 @@ button.secondaire{background:var(--bord);color:var(--txt)}
     <div id="voyantTexte" class="doux"></div>
     <div id="voyantChecks" style="margin-top:8px"></div>
     <div id="voyantBilan" class="note"></div>
+    <div id="bulletin" class="note"></div>
     <label class="case" style="margin-top:12px"><input type="checkbox" id="voyantAlerte"><span>Me prévenir quand le voyant change de couleur (vérifié chaque soir après la clôture de Zurich)</span></label>
     <div class="note">4 vérifications automatiques sur l’action à Zurich, comme un trader. Personne ne sait prédire la Bourse : c’est un repère, pas une garantie.</div>
   </section>
@@ -636,7 +637,7 @@ function afficherActus() {
 }
 
 function toutAfficher() {
-  [afficherFCPE, afficherCours, afficherReperes, afficherBacktest, dessiner, afficherActus, afficherAlertes, afficherVoyant].forEach(sur);
+  [afficherFCPE, afficherCours, afficherReperes, afficherBacktest, dessiner, afficherActus, afficherAlertes, afficherVoyant, afficherBulletin].forEach(sur);
   maj(etatEntete());
 }
 
@@ -814,6 +815,68 @@ id('voyantAlerte').onchange = () => {
   sur(afficherAlertes);
 };
 
+// ---------- Journal et bulletin de notes (1.5) : le voyant est noté sur ce qui s’est vraiment passé ensuite ----------
+const CLE_SUIVI = 'novartis.suivi.debut';
+const HORIZONS = [[21, '1 mois'], [63, '3 mois'], [126, '6 mois']];
+// couleur du voyant à chaque séance, calculée avec les seuls cours connus ce jour-là (mêmes règles que le voyant)
+function couleursVoyant(a) {
+  const m50 = moyenneMobile(a, 50), m200 = moyenneMobile(a, 200);
+  return a.map((p, i) => {
+    if (m200[i] == null) return null;
+    const r = rsi(a.slice(Math.max(0, i - 249), i + 1), 14);
+    return couleurDuScore([p > m200[i], m50[i] > m200[i], p > m50[i], r < 70].filter(Boolean).length);
+  });
+}
+// pour chaque jour à partir de « debut » : le cours a-t-il monté ou baissé « h » séances plus tard ?
+function bulletin(a, couleurs, debut, h) {
+  const r = { vert: { n: 0, bons: 0 }, rouge: { n: 0, bons: 0 }, tous: { n: 0, hausses: 0 } };
+  for (let i = debut; i + h < a.length; i++) {
+    const c = couleurs[i];
+    if (!c) continue;
+    const v = a[i + h] / a[i] - 1;
+    r.tous.n++; if (v > 0) r.tous.hausses++;
+    if (c === 'vert') { r.vert.n++; if (v > 0) r.vert.bons++; }
+    if (c === 'rouge') { r.rouge.n++; if (v < 0) r.rouge.bons++; }
+  }
+  return r;
+}
+function verdictBulletin(b) {
+  if (b.vert.n < 20 || b.rouge.n < 20) return 'Pas encore assez de jours pour juger.';
+  const hasard = b.tous.hausses / b.tous.n;
+  const mieux = b.vert.bons / b.vert.n > hasard + 0.05 && b.rouge.bons / b.rouge.n > 1 - hasard + 0.05;
+  return mieux ? 'À 3 mois, le voyant fait nettement mieux que le hasard.' : 'À 3 mois, le voyant ne fait pas nettement mieux que le hasard : garde-le comme un repère.';
+}
+function tableBulletin(a, couleurs, debut) {
+  const pc = (x, n) => (n ? formaterNombre(x / n * 100, 0) + '\u00a0%' : '—');
+  const lignes = HORIZONS.map(([h, nom]) => {
+    const b = bulletin(a, couleurs, debut, h);
+    return b.tous.n ? '<tr><td>' + nom + '</td><td>' + pc(b.vert.bons, b.vert.n) + '<small>' + b.vert.n + ' j</small></td><td>'
+      + pc(b.rouge.bons, b.rouge.n) + '<small>' + b.rouge.n + ' j</small></td><td>' + pc(b.tous.hausses, b.tous.n) + '</td></tr>' : '';
+  }).join('');
+  return lignes ? '<table><thead><tr><th>Après</th><th>Vert ✓</th><th>Rouge ✓</th><th>Hasard</th></tr></thead><tbody>' + lignes + '</tbody></table>' : '';
+}
+function afficherBulletin() {
+  const s = etat.donnees && etat.donnees.novn, el = id('bulletin');
+  if (!s || s.a.length < 260) { el.innerHTML = ''; return; }
+  if (!localStorage.getItem(CLE_SUIVI)) localStorage.setItem(CLE_SUIVI, dernier(s.j)); // début du vrai suivi : le jour où la 1.5 voit ses premiers cours
+  const debutSuivi = localStorage.getItem(CLE_SUIVI), couleurs = couleursVoyant(s.a), n = s.a.length;
+  let k = s.j.findIndex((j) => j >= debutSuivi);
+  if (k < 0) k = n - 1;
+  const passe = Math.max(0, n - 1 - 5 * SEANCES_AN);
+  const changements = [];
+  for (let i = n - 1; i > 0 && changements.length < 4; i--) {
+    if (couleurs[i] && couleurs[i - 1] && couleurs[i] !== couleurs[i - 1]) changements.push(TEXTES_VOYANT[couleurs[i]][0].split(' ')[0] + ' le ' + dateFR(s.j[i]) + ' à ' + formaterNombre(s.c[i]) + '\u00a0CHF');
+  }
+  const reel = tableBulletin(s.a, couleurs, k), attente = Math.max(1, 22 - (n - 1 - k));
+  el.innerHTML = '<b style="color:var(--txt)">Bulletin de notes du voyant</b>'
+    + '<div>Vert ✓ : après un feu vert, le cours a monté. Rouge ✓ : après un feu rouge, il a baissé. Hasard : n’importe quel jour, le cours a monté.</div>'
+    + '<div style="margin-top:8px"><b>Vrai suivi</b> depuis le ' + dateFR(debutSuivi) + ' : ' + (reel ? '' : 'premières notes dans ' + attente + ' séance' + (attente > 1 ? 's' : '') + ' (il faut laisser passer 1 mois).') + '</div>'
+    + reel + (reel ? '<div>' + verdictBulletin(bulletin(s.a, couleurs, k, 63)) + '</div>' : '')
+    + '<div style="margin-top:8px"><b>Reconstitué</b> sur 5 ans, mêmes règles :</div>' + tableBulletin(s.a, couleurs, passe)
+    + '<div>' + verdictBulletin(bulletin(s.a, couleurs, passe, 63)) + '</div>'
+    + (changements.length ? '<div style="margin-top:8px">Derniers changements : ' + changements.map(echapper).join(' · ') + '</div>' : '');
+}
+
 // ---------- Mise à jour des cours ----------
 async function actualiser() {
   if (!DANS_APPLI) { maj(etatEntete()); return; }
@@ -924,6 +987,8 @@ function controleQualite() {
     ['Mouvement de −3,2 % avec un seuil de ±3 % → alerte', () => mouvementAlerte(-3.2, 3), true],
     ['Voyant : cours qui monte tout le temps (100 → 349) → vert, 3 sur 4 (surchauffe)', () => { const v = voyant(Array.from({ length: 250 }, (_, i) => 100 + i)); return v.couleur + ' ' + v.score; }, 'vert 3'],
     ['Voyant : cours qui baisse tout le temps (349 → 100) → rouge, 1 sur 4', () => { const v = voyant(Array.from({ length: 250 }, (_, i) => 349 - i)); return v.couleur + ' ' + v.score; }, 'rouge 1'],
+    ['Bulletin : vert puis 110, rouge puis 105, vert puis 120 → tout juste', () => { const b = bulletin([100, 110, 105, 120], ['vert', 'rouge', 'vert', null], 0, 1); return 'vert ' + b.vert.bons + '/' + b.vert.n + ' rouge ' + b.rouge.bons + '/' + b.rouge.n + ' hausses ' + b.tous.hausses + '/' + b.tous.n; }, 'vert 2/2 rouge 1/1 hausses 2/3'],
+    ['Bulletin : feu vert suivi d’une baisse (100 → 90) → compté faux', () => { const b = bulletin([100, 90, 95], ['vert', 'vert', null], 0, 1); return b.vert.bons + '/' + b.vert.n; }, '1/2'],
   ];
   const ko = [];
   for (const [nom, f, attendu] of cas) {
