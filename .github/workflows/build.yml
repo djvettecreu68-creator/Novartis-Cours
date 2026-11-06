@@ -574,45 +574,40 @@ jobs:
                   sp.edit().putString("jour_" + cle, s.jour()).apply();
               }
 
-              /** Écrit dans le widget ce qu'il doit afficher : VL, direction, alertes ou cours. */
+              /** Écrit dans le widget ce qu'il doit afficher : VL, direction, fourchette. */
               static void enregistrerWidget(Context c, Serie novn, Serie nvs, Double vl, JSONObject cfg) {
                   try {
-                      // Ligne 1 : La VL estimée avec sa variation
-                      StringBuilder l1 = new StringBuilder();
+                      String vlTxt = "— €", varTxt = "", varCls = "doux", dirTxt = "", fourchette = "";
                       if (vl != null) {
-                          double var = cfg.optDouble("vlRef", 0) > 0 ? (vl / cfg.optDouble("vlRef") - 1) * 100 : 0;
-                          l1.append(var > 0 ? "📈" : (var < 0 ? "📉" : "➖")).append(" VL ").append(nombre(vl)).append(" € (").append(String.format(Locale.FRANCE, "%+.2f %%", var)).append(")");
-                      } else {
-                          l1.append("⚙️ VL à configurer");
+                          vlTxt = nombre(vl) + " €";
+                          double vRef = cfg.optDouble("vlRef", 0);
+                          if (vRef > 0) {
+                              double var = (vl / vRef - 1) * 100;
+                              varTxt = String.format(Locale.FRANCE, "%+.2f %%", var);
+                              varCls = var > 0 ? "vert" : (var < 0 ? "rouge" : "doux");
+                          }
                       }
-
-                      // Ligne 2 : La direction court terme (Prévision)
-                      StringBuilder l2 = new StringBuilder();
                       String cVoy = couleurVoyant(novn.a);
                       if (cVoy != null) {
-                          l2.append(cVoy.equals("vert") ? "🟢 Plutôt hausse" : (cVoy.equals("orange") ? "🟠 Indécis" : "🔴 Plutôt baisse"));
+                          dirTxt = cVoy.equals("vert") ? "🟢 Plutôt hausse" : (cVoy.equals("orange") ? "🟠 Indécis" : "🔴 Plutôt baisse");
                       }
-
-                      // Ligne 3 : Les cours (ou l'alerte si déclenchée)
-                      java.util.List<String> al = new java.util.ArrayList<>();
-                      if (vl != null) {
-                          if (cfg.optDouble("vlBas", 0) > 0 && vl <= cfg.optDouble("vlBas")) al.add("VL sous " + nombre(cfg.optDouble("vlBas")) + " €");
-                          if (cfg.optDouble("vlHaut", 0) > 0 && vl >= cfg.optDouble("vlHaut")) al.add("VL au-dessus de " + nombre(cfg.optDouble("vlHaut")) + " €");
-                      }
-                      if (cfg.optDouble("nvsBas", 0) > 0 && nvs.dernier() <= cfg.optDouble("nvsBas")) al.add("NVS sous " + nombre(cfg.optDouble("nvsBas")) + " $");
-                      if (cfg.optDouble("nvsHaut", 0) > 0 && nvs.dernier() >= cfg.optDouble("nvsHaut")) al.add("NVS au-dessus de " + nombre(cfg.optDouble("nvsHaut")) + " $");
-                      
-                      String alertes = "";
-                      if (!al.isEmpty()) {
-                          alertes = al.size() > 2 ? "⚠️ " + al.size() + " alertes" : "⚠️ " + String.join(" · ", al);
-                      } else {
-                          alertes = "NOVN " + nombre(novn.dernier()) + " CHF · NVS " + nombre(nvs.dernier()) + " $";
+                      if (vl != null && novn.a.size() > 1) {
+                          int n = novn.a.size(), debut = Math.max(1, n - 61);
+                          double m = 0, s = 0;
+                          for (int i = debut; i < n; i++) m += Math.log(novn.a.get(i) / novn.a.get(i - 1));
+                          m /= (n - debut);
+                          for (int i = debut; i < n; i++) { double d = Math.log(novn.a.get(i) / novn.a.get(i - 1)) - m; s += d * d; }
+                          double sig = Math.sqrt(s / Math.max(1, n - debut - 1));
+                          double min = vl * Math.exp(-sig), max = vl * Math.exp(sig);
+                          fourchette = "Demain : " + nombre(min) + " – " + nombre(max) + " €";
                       }
 
                       JSONObject w = new JSONObject();
-                      w.put("novn", l1.toString());
-                      w.put("nvs", l2.toString());
-                      w.put("alertes", alertes);
+                      w.put("vl", vlTxt);
+                      w.put("var", varTxt);
+                      w.put("varCls", varCls);
+                      w.put("dir", dirTxt);
+                      w.put("fourchette", fourchette);
                       w.put("quand", heure());
                       c.getSharedPreferences("widget", android.content.Context.MODE_PRIVATE).edit().putString("donnees", w.toString()).apply();
                       WidgetNovartis.rafraichirTout(c);
@@ -702,34 +697,49 @@ jobs:
                   android:id="@+id/w_titre"
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
-                  android:text="Novartis Cours"
+                  android:text="Mon FCPE Novartis"
                   android:textColor="#FFFFFF"
                   android:textSize="12sp"
                   android:textStyle="bold" />
-              <TextView
-                  android:id="@+id/w_ligne1"
+              <LinearLayout
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
-                  android:layout_marginTop="4dp"
-                  android:text="—"
-                  android:textColor="#FFFFFF"
-                  android:textSize="15sp"
-                  android:textStyle="bold" />
+                  android:orientation="horizontal"
+                  android:gravity="center_vertical"
+                  android:layout_marginTop="4dp">
+                  <TextView
+                      android:id="@+id/w_vl"
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:text="109,84 €"
+                      android:textColor="#FFFFFF"
+                      android:textSize="22sp"
+                      android:textStyle="bold" />
+                  <TextView
+                      android:id="@+id/w_var"
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:layout_marginStart="8dp"
+                      android:text="-1,99 %"
+                      android:textColor="#EF7468"
+                      android:textSize="14sp"
+                      android:textStyle="bold" />
+              </LinearLayout>
               <TextView
-                  android:id="@+id/w_ligne2"
-                  android:layout_width="match_parent"
-                  android:layout_height="wrap_content"
-                  android:text="—"
-                  android:textColor="#FFFFFF"
-                  android:textSize="12sp" />
-              <TextView
-                  android:id="@+id/w_alertes"
+                  android:id="@+id/w_dir"
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
                   android:layout_marginTop="2dp"
-                  android:text=""
-                  android:textColor="#FFD54F"
-                  android:textSize="11sp" />
+                  android:text="🟠 Indécis"
+                  android:textColor="#FFFFFF"
+                  android:textSize="13sp" />
+              <TextView
+                  android:id="@+id/w_fourchette"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:text="Demain : 107,53 – 112,20 €"
+                  android:textColor="#E0FFFFFF"
+                  android:textSize="12sp" />
               <TextView
                   android:id="@+id/w_quand"
                   android:layout_width="match_parent"
@@ -799,29 +809,39 @@ jobs:
                       SharedPreferences sp = c.getSharedPreferences("widget", Context.MODE_PRIVATE);
                       String brut = sp.getString("donnees", "");
                       if (brut.isEmpty()) {
-                          v.setTextViewText(R.id.w_ligne1, "Ouvre Novartis Cours");
-                          v.setTextViewText(R.id.w_ligne2, "pour voir les cours");
-                          v.setTextViewText(R.id.w_alertes, "");
+                          v.setTextViewText(R.id.w_vl, "Ouvre l'appli");
+                          v.setTextViewText(R.id.w_var, "");
+                          v.setTextViewText(R.id.w_dir, "");
+                          v.setTextViewText(R.id.w_fourchette, "pour voir les cours");
                           v.setTextViewText(R.id.w_quand, "");
                       } else {
                           JSONObject d = new JSONObject(brut);
-                          v.setTextViewText(R.id.w_ligne1, d.optString("novn", "—"));
-                          v.setTextViewText(R.id.w_ligne2, d.optString("nvs", "—"));
-                          v.setTextViewText(R.id.w_alertes, d.optString("alertes", ""));
+                          v.setTextViewText(R.id.w_vl, d.optString("vl", "— €"));
+                          v.setTextViewText(R.id.w_var, d.optString("var", ""));
+                          String cls = d.optString("varCls", "doux");
+                          if (cls.equals("vert")) v.setTextColor(R.id.w_var, android.graphics.Color.parseColor("#4CC27A"));
+                          else if (cls.equals("rouge")) v.setTextColor(R.id.w_var, android.graphics.Color.parseColor("#EF7468"));
+                          else v.setTextColor(R.id.w_var, android.graphics.Color.parseColor("#9AA7B2"));
+                          
+                          v.setTextViewText(R.id.w_dir, d.optString("dir", ""));
+                          v.setTextViewText(R.id.w_fourchette, d.optString("fourchette", ""));
                           v.setTextViewText(R.id.w_quand, d.optString("quand", ""));
                       }
                   } catch (Exception e) {
-                      v.setTextViewText(R.id.w_ligne1, "Erreur widget");
-                      v.setTextViewText(R.id.w_ligne2, "");
-                      v.setTextViewText(R.id.w_alertes, "");
+                      v.setTextViewText(R.id.w_vl, "Erreur widget");
+                      v.setTextViewText(R.id.w_var, "");
+                      v.setTextViewText(R.id.w_dir, "");
+                      v.setTextViewText(R.id.w_fourchette, "");
                       v.setTextViewText(R.id.w_quand, "");
                   }
                   Intent i = new Intent(c, MainActivity.class);
                   i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
                   PendingIntent pi = PendingIntent.getActivity(c, 0, i, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
                   v.setOnClickPendingIntent(R.id.w_titre, pi);
-                  v.setOnClickPendingIntent(R.id.w_ligne1, pi);
-                  v.setOnClickPendingIntent(R.id.w_ligne2, pi);
+                  v.setOnClickPendingIntent(R.id.w_vl, pi);
+                  v.setOnClickPendingIntent(R.id.w_var, pi);
+                  v.setOnClickPendingIntent(R.id.w_dir, pi);
+                  v.setOnClickPendingIntent(R.id.w_fourchette, pi);
                   return v;
               }
           }
