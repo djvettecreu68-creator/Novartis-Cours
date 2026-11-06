@@ -89,6 +89,7 @@ jobs:
               <uses-permission android:name="android.permission.VIBRATE" />
               <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
               <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
               <queries>
                   <package android:name="fr.hack68.playstoore" />
               </queries>
