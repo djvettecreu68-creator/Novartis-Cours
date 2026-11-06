@@ -645,6 +645,31 @@ function afficherActus() {
     + (a.erreurs.length ? '<div class="note">Indisponible : ' + echapper(a.erreurs.join(', ')) + '</div>' : '');
 }
 
+// Widget d'écran d'accueil : envoie les cours et les alertes déclenchées à la partie Android, qui met à jour le widget.
+function majWidgetAppli() {
+  if (!(A && A.majWidget)) return;
+  try {
+    const d = etat.donnees || {};
+    if (!d.novn) { A.majWidget(JSON.stringify({ novn: 'Ouvre Novartis Cours', nvs: 'pour voir les cours', alertes: '', quand: '' })); return; }
+    const fmt = (v) => formaterNombre(v).replace(/[\u00a0\u202f]/g, ' ');
+    const vTxt = (s) => { const x = variationJour(s); return x == null ? '' : ' (' + pct(x) + ')'; };
+    const fleche = (s) => { const x = variationJour(s); return x == null ? '•' : (x > 0 ? '📈' : (x < 0 ? '📉' : '➖')); };
+    const novn = fleche(d.novn) + ' NOVN ' + fmt(dernier(d.novn.c)) + ' CHF' + vTxt(d.novn);
+    const nvs = d.nvs ? fleche(d.nvs) + ' NVS ' + fmt(dernier(d.nvs.c)) + ' $' + vTxt(d.nvs) : '';
+    const al = lireAlertes(), deja = [];
+    const vlRef = lireNombre(localStorage.getItem(CLE.vlRef)), vlDate = localStorage.getItem(CLE.vlDate);
+    const r = vlRef && vlDate && d.novn && d.eurchf ? calculFCPE(d, vlRef, vlDate) : null;
+    const vl = r && !r.erreur ? r.vl : null, nvsP = d.nvs ? dernier(d.nvs.c) : null;
+    if (vl != null && al.vlBas && seuilAtteint(vl, al.vlBas, true)) deja.push('VL sous ' + fmt(al.vlBas) + ' €');
+    if (vl != null && al.vlHaut && seuilAtteint(vl, al.vlHaut, false)) deja.push('VL au-dessus de ' + fmt(al.vlHaut) + ' €');
+    if (nvsP != null && al.nvsBas && seuilAtteint(nvsP, al.nvsBas, true)) deja.push('NVS sous ' + fmt(al.nvsBas) + ' $');
+    if (nvsP != null && al.nvsHaut && seuilAtteint(nvsP, al.nvsHaut, false)) deja.push('NVS au-dessus de ' + fmt(al.nvsHaut) + ' $');
+    if (al.variation && [d.novn, d.nvs].some((s) => s && variationJour(s) != null && mouvementAlerte(variationJour(s), al.variation))) deja.push('mouvement ±' + fmt(al.variation) + ' %');
+    const alertes = deja.length > 2 ? '⚠️ ' + deja.length + ' alertes' : deja.map((x) => '⚠️ ' + x).join(' · ');
+    A.majWidget(JSON.stringify({ novn, nvs, alertes, quand: d.quand ? quand(d.quand) : '' }));
+  } catch (e) { console.error('Widget : ' + ((e && e.stack) || e)); }
+}
+
 function toutAfficher() {
   [afficherFCPE, afficherCours, afficherReperes, afficherBacktest, dessiner, afficherActus, afficherAlertes, afficherVoyant, afficherBulletin, afficherPrevision].forEach(sur);
   maj(etatEntete());
@@ -686,6 +711,7 @@ function afficherAlertes() {
     if (e.erreur) lignes.push('Dernière erreur de la veille : ' + e.erreur);
   } else lignes.push('Les alertes marchent seulement dans l’appli, sur le téléphone.');
   id('alEtat').innerHTML = lignes.map(echapper).join('<br>');
+  sur(majWidgetAppli);
 }
 id('enregistrerAlertes').onclick = () => {
   const msg = (t) => { id('alMessage').textContent = t; };

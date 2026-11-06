@@ -110,6 +110,16 @@ jobs:
                       android:name=".VeilleJob"
                       android:permission="android.permission.BIND_JOB_SERVICE"
                       android:exported="false" />
+                  <receiver
+                      android:name=".WidgetNovartis"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                      </intent-filter>
+                      <meta-data
+                          android:name="android.appwidget.provider"
+                          android:resource="@xml/widget_info" />
+                  </receiver>
               </application>
           </manifest>
           EOF_4
@@ -298,6 +308,13 @@ jobs:
                   @JavascriptInterface public void configurerAlertes(String json) {
                       try { VeilleJob.configurer(MainActivity.this, json); }
                       catch (Exception e) { signalerErreur("Alertes : réglages refusés : " + e); }
+                  }
+
+                  @JavascriptInterface public void majWidget(String json) {
+                      try {
+                          getSharedPreferences("widget", Context.MODE_PRIVATE).edit().putString("donnees", json).apply();
+                          WidgetNovartis.rafraichirTout(getApplicationContext());
+                      } catch (Exception ignore) { }
                   }
 
                   @JavascriptInterface public String etatAlertes() {
@@ -511,9 +528,11 @@ jobs:
                   }
                   StringBuilder bilan = new StringBuilder(heure());
                   Serie novn = charger("NOVN.SW", periode);
+                  Double vlCalculee = null;
                   if (avecVL) {
                       Double vl = estimerVL(novn, charger("EURCHF=X", periode), vlRef, jourRef);
                       if (vl != null) {
+                          vlCalculee = vl;
                           bilan.append(" · VL ≈ ").append(nombre(vl)).append(" €");
                           seuil(c, sp, cfg, "vlBas", vl, true, "VL du FCPE", "€", 101);
                           seuil(c, sp, cfg, "vlHaut", vl, false, "VL du FCPE", "€", 102);
@@ -526,6 +545,7 @@ jobs:
                   mouvement(c, sp, cfg, "novn", "Novartis à Zurich", novn, 105);
                   mouvement(c, sp, cfg, "nvs", "NVS à New York", nvs, 106);
                   voyant(c, sp, cfg, m, minutes, force, bilan);
+                  enregistrerWidget(c, novn, nvs, vlCalculee, cfg);
                   sp.edit().putString("bilan", bilan.toString()).putString("erreur", "").putString("dejaSignale", "").apply();
               }
 
@@ -553,8 +573,37 @@ jobs:
                   sp.edit().putString("jour_" + cle, s.jour()).apply();
               }
 
-              /** Direction à court terme : 4 vérifications sur l'action à Zurich, mêmes règles que l'écran. null si pas assez d'historique. */
-              static String couleurVoyant(ArrayList<Double> a) {
+                  /** Écrit dans le widget ce qu'il doit afficher : cours, variation, alertes déclenchées. */
+                  static void enregistrerWidget(Context c, Serie novn, Serie nvs, Double vl, JSONObject cfg) {
+                      try {
+                          StringBuilder l1 = new StringBuilder();
+                          Double varN = novn.variation();
+                          l1.append(varN == null ? "•" : (varN > 0 ? "📈" : (varN < 0 ? "📉" : "➖"))).append(" NOVN ").append(nombre(novn.dernier())).append(" CHF");
+                          if (varN != null) l1.append(" (").append(String.format(Locale.FRANCE, "%+.1f %%", varN)).append(")");
+                          StringBuilder l2 = new StringBuilder();
+                          Double varV = nvs.variation();
+                          l2.append(varV == null ? "•" : (varV > 0 ? "📈" : (varV < 0 ? "📉" : "➖"))).append(" NVS ").append(nombre(nvs.dernier())).append(" $");
+                          if (varV != null) l2.append(" (").append(String.format(Locale.FRANCE, "%+.1f %%", varV)).append(")");
+                          java.util.List<String> al = new java.util.ArrayList<>();
+                          if (vl != null) {
+                              if (cfg.optDouble("vlBas", 0) > 0 && vl <= cfg.optDouble("vlBas")) al.add("VL sous " + nombre(cfg.optDouble("vlBas")) + " €");
+                              if (cfg.optDouble("vlHaut", 0) > 0 && vl >= cfg.optDouble("vlHaut")) al.add("VL au-dessus de " + nombre(cfg.optDouble("vlHaut")) + " €");
+                          }
+                          if (cfg.optDouble("nvsBas", 0) > 0 && nvs.dernier() <= cfg.optDouble("nvsBas")) al.add("NVS sous " + nombre(cfg.optDouble("nvsBas")) + " $");
+                          if (cfg.optDouble("nvsHaut", 0) > 0 && nvs.dernier() >= cfg.optDouble("nvsHaut")) al.add("NVS au-dessus de " + nombre(cfg.optDouble("nvsHaut")) + " $");
+                          String alertes = al.size() > 2 ? "⚠️ " + al.size() + " alertes" : (al.isEmpty() ? "" : "⚠️ " + String.join(" · ", al));
+                          JSONObject w = new JSONObject();
+                          w.put("novn", l1.toString());
+                          w.put("nvs", l2.toString());
+                          w.put("alertes", alertes);
+                          w.put("quand", heure());
+                          c.getSharedPreferences("widget", Context.MODE_PRIVATE).edit().putString("donnees", w.toString()).apply();
+                          WidgetNovartis.rafraichirTout(c);
+                      } catch (Exception ignore) { }
+                  }
+
+                  /** Direction à court terme : 4 vérifications sur l'action à Zurich, mêmes règles que l'écran. null si pas assez d'historique. */
+                  static String couleurVoyant(ArrayList<Double> a) {
                   int n = a.size();
                   if (n < 25) return null;
                   double p = a.get(n - 1), m10 = 0, m20 = 0;
@@ -623,6 +672,140 @@ jobs:
               }
           }
           EOF_9
+          mkdir -p "$(dirname "app/src/main/res/layout/widget.xml")"
+          cat > 'app/src/main/res/layout/widget.xml' <<'EOF_10'
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:orientation="vertical"
+              android:padding="10dp"
+              android:background="@drawable/widget_fond">
+              <TextView
+                  android:id="@+id/w_titre"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:text="Novartis Cours"
+                  android:textColor="#FFFFFF"
+                  android:textSize="12sp"
+                  android:textStyle="bold" />
+              <TextView
+                  android:id="@+id/w_ligne1"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:layout_marginTop="4dp"
+                  android:text="—"
+                  android:textColor="#FFFFFF"
+                  android:textSize="15sp"
+                  android:textStyle="bold" />
+              <TextView
+                  android:id="@+id/w_ligne2"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:text="—"
+                  android:textColor="#FFFFFF"
+                  android:textSize="12sp" />
+              <TextView
+                  android:id="@+id/w_alertes"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:layout_marginTop="2dp"
+                  android:text=""
+                  android:textColor="#FFD54F"
+                  android:textSize="11sp" />
+              <TextView
+                  android:id="@+id/w_quand"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:gravity="end"
+                  android:text=""
+                  android:textColor="#80FFFFFF"
+                  android:textSize="10sp" />
+          </LinearLayout>
+          EOF_10
+          mkdir -p "$(dirname "app/src/main/res/xml/widget_info.xml")"
+          cat > 'app/src/main/res/xml/widget_info.xml' <<'EOF_11'
+          <?xml version="1.0" encoding="utf-8"?>
+          <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+              android:minWidth="250dp"
+              android:minHeight="110dp"
+              android:updatePeriodMillis="1800000"
+              android:initialLayout="@layout/widget"
+              android:resizeMode="horizontal|vertical"
+              android:widgetCategory="home_screen" />
+          EOF_11
+          mkdir -p "$(dirname "app/src/main/res/drawable/widget_fond.xml")"
+          cat > 'app/src/main/res/drawable/widget_fond.xml' <<'EOF_12'
+          <?xml version="1.0" encoding="utf-8"?>
+          <shape xmlns:android="http://schemas.android.com/apk/res/android"
+              android:shape="rectangle">
+              <solid android:color="#0B5FA5" />
+              <corners android:radius="16dp" />
+          </shape>
+          EOF_12
+          mkdir -p "$(dirname "app/src/main/java/fr/hack68/novartis/WidgetNovartis.java")"
+          cat > 'app/src/main/java/fr/hack68/novartis/WidgetNovartis.java' <<'EOF_13'
+          package fr.hack68.novartis;
+
+          import android.app.PendingIntent;
+          import android.appwidget.AppWidgetManager;
+          import android.appwidget.AppWidgetProvider;
+          import android.content.ComponentName;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.content.SharedPreferences;
+          import android.widget.RemoteViews;
+          import org.json.JSONObject;
+
+          /** Widget d'écran d'accueil : cours Novartis, variation et alertes. Lit SharedPreferences("widget"). */
+          public class WidgetNovartis extends AppWidgetProvider {
+              @Override public void onUpdate(Context c, AppWidgetManager m, int[] ids) {
+                  for (int id : ids) m.updateAppWidget(id, construire(c));
+              }
+
+              static void rafraichirTout(Context c) {
+                  try {
+                      AppWidgetManager m = AppWidgetManager.getInstance(c);
+                      int[] ids = m.getAppWidgetIds(new ComponentName(c, WidgetNovartis.class));
+                      if (ids.length == 0) return;
+                      RemoteViews v = construire(c);
+                      for (int id : ids) m.updateAppWidget(id, v);
+                  } catch (Exception ignore) { }
+              }
+
+              static RemoteViews construire(Context c) {
+                  RemoteViews v = new RemoteViews(c.getPackageName(), R.layout.widget);
+                  try {
+                      SharedPreferences sp = c.getSharedPreferences("widget", Context.MODE_PRIVATE);
+                      String brut = sp.getString("donnees", "");
+                      if (brut.isEmpty()) {
+                          v.setTextViewText(R.id.w_ligne1, "Ouvre Novartis Cours");
+                          v.setTextViewText(R.id.w_ligne2, "pour voir les cours");
+                          v.setTextViewText(R.id.w_alertes, "");
+                          v.setTextViewText(R.id.w_quand, "");
+                      } else {
+                          JSONObject d = new JSONObject(brut);
+                          v.setTextViewText(R.id.w_ligne1, d.optString("novn", "—"));
+                          v.setTextViewText(R.id.w_ligne2, d.optString("nvs", "—"));
+                          v.setTextViewText(R.id.w_alertes, d.optString("alertes", ""));
+                          v.setTextViewText(R.id.w_quand, d.optString("quand", ""));
+                      }
+                  } catch (Exception e) {
+                      v.setTextViewText(R.id.w_ligne1, "Erreur widget");
+                      v.setTextViewText(R.id.w_ligne2, "");
+                      v.setTextViewText(R.id.w_alertes, "");
+                      v.setTextViewText(R.id.w_quand, "");
+                  }
+                  Intent i = new Intent(c, MainActivity.class);
+                  i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                  PendingIntent pi = PendingIntent.getActivity(c, 0, i, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+                  v.setOnClickPendingIntent(R.id.w_titre, pi);
+                  v.setOnClickPendingIntent(R.id.w_ligne1, pi);
+                  v.setOnClickPendingIntent(R.id.w_ligne2, pi);
+                  return v;
+              }
+          }
+          EOF_13
           cp signature.keystore app/signature.keystore
           mkdir -p app/src/main/assets
           cp index.html app/src/main/assets/index.html
