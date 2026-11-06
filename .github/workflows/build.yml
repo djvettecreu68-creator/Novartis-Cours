@@ -88,6 +88,7 @@ jobs:
               <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="android.permission.VIBRATE" />
               <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+              <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
               <queries>
                   <package android:name="fr.hack68.playstoore" />
               </queries>
@@ -104,6 +105,10 @@ jobs:
                           <category android:name="android.intent.category.LAUNCHER" />
                       </intent-filter>
                   </activity>
+                  <service
+                      android:name=".VeilleJob"
+                      android:permission="android.permission.BIND_JOB_SERVICE"
+                      android:exported="false" />
               </application>
           </manifest>
           EOF_4
@@ -288,9 +293,290 @@ jobs:
                   @JavascriptInterface public void ouvrirLien(String url) {
                       try { startActivity(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))); } catch (Exception ignore) { }
                   }
+
+                  @JavascriptInterface public void configurerAlertes(String json) {
+                      try { VeilleJob.configurer(MainActivity.this, json); }
+                      catch (Exception e) { signalerErreur("Alertes : réglages refusés : " + e); }
+                  }
+
+                  @JavascriptInterface public String etatAlertes() {
+                      try {
+                          android.content.SharedPreferences sp = VeilleJob.prefs(MainActivity.this);
+                          android.app.job.JobScheduler js = getSystemService(android.app.job.JobScheduler.class);
+                          android.app.NotificationManager nm = getSystemService(android.app.NotificationManager.class);
+                          return new org.json.JSONObject()
+                                  .put("bilan", sp.getString("bilan", ""))
+                                  .put("erreur", sp.getString("erreur", ""))
+                                  .put("planifie", js != null && js.getPendingJob(VeilleJob.ID) != null)
+                                  .put("notifications", nm != null && nm.areNotificationsEnabled())
+                                  .toString();
+                      } catch (Exception e) { return "{}"; }
+                  }
+
+                  @JavascriptInterface public void testerAlertes() {
+                      new Thread(() -> {
+                          VeilleJob.notifier(MainActivity.this, 100, "Test : les alertes marchent ✓", "Tu recevras ce genre de message quand un de tes seuils sera franchi.");
+                          String resultat = "ok";
+                          try { VeilleJob.verifier(getApplicationContext(), true); }
+                          catch (Exception e) { resultat = String.valueOf(e); VeilleJob.prefs(MainActivity.this).edit().putString("erreur", VeilleJob.heure() + " : " + resultat).apply(); }
+                          final String appel = "window.__alertesTestees && window.__alertesTestees(" + org.json.JSONObject.quote(resultat) + ")";
+                          runOnUiThread(() -> w.evaluateJavascript(appel, null));
+                      }).start();
+                  }
               }
           }
           EOF_8
+          mkdir -p "$(dirname "app/src/main/java/fr/hack68/novartis/VeilleJob.java")"
+          cat > 'app/src/main/java/fr/hack68/novartis/VeilleJob.java' <<'EOF_9'
+          package fr.hack68.novartis;
+
+          import android.app.Notification;
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
+          import android.app.PendingIntent;
+          import android.app.job.JobInfo;
+          import android.app.job.JobParameters;
+          import android.app.job.JobScheduler;
+          import android.app.job.JobService;
+          import android.content.ComponentName;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.content.SharedPreferences;
+          import java.util.ArrayList;
+          import java.util.Locale;
+          import org.json.JSONArray;
+          import org.json.JSONObject;
+
+          /** Veille des alertes : toutes les 30 min, du lundi au vendredi de 8h45 à 22h30 (heure de Paris), même appli fermée. */
+          public class VeilleJob extends JobService {
+              static final int ID = 7;
+              static final String CANAL = "novartis_alertes";
+
+              @Override
+              public boolean onStartJob(JobParameters p) {
+                  new Thread(() -> {
+                      Context c = getApplicationContext();
+                      try {
+                          verifier(c, false);
+                      } catch (Throwable t) {
+                          String texte = String.valueOf(t);
+                          SharedPreferences sp = prefs(c);
+                          if (!texte.equals(sp.getString("dejaSignale", ""))) {
+                              signaler(c, texte);
+                              sp.edit().putString("dejaSignale", texte).apply();
+                          }
+                          sp.edit().putString("erreur", heure() + " : " + texte).apply();
+                      }
+                      jobFinished(p, false);
+                  }).start();
+                  return true;
+              }
+
+              @Override
+              public boolean onStopJob(JobParameters p) { return true; }
+
+              static SharedPreferences prefs(Context c) { return c.getSharedPreferences("alertes", Context.MODE_PRIVATE); }
+
+              static String heure() { return java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM HH:mm")); }
+
+              static String nombre(double v) { return String.format(Locale.FRANCE, "%.2f", v); }
+
+              static void planifier(Context c, boolean actif) {
+                  JobScheduler js = c.getSystemService(JobScheduler.class);
+                  if (js == null) return;
+                  if (!actif) { js.cancel(ID); return; }
+                  if (js.getPendingJob(ID) != null) return;
+                  js.schedule(new JobInfo.Builder(ID, new ComponentName(c, VeilleJob.class))
+                          .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
+                          .setPeriodic(30 * 60 * 1000L)
+                          .setPersisted(true)
+                          .build());
+              }
+
+              /** Réglages venus de l'écran. Un seuil qui change est réarmé : il pourra prévenir à nouveau. */
+              static void configurer(Context c, String json) throws Exception {
+                  SharedPreferences sp = prefs(c);
+                  JSONObject avant = new JSONObject(sp.getString("config", "{}")), apres = new JSONObject(json);
+                  SharedPreferences.Editor e = sp.edit().putString("config", json);
+                  for (String cle : new String[]{"vlBas", "vlHaut", "nvsBas", "nvsHaut"})
+                      if (avant.optDouble(cle, -1) != apres.optDouble(cle, -1)) e.remove("dit_" + cle);
+                  if (avant.optDouble("variation", -1) != apres.optDouble("variation", -1)) e.remove("jour_novn").remove("jour_nvs");
+                  e.apply();
+                  planifier(c, apres.optBoolean("actif", false));
+              }
+
+              /** Une série de cours Yahoo : horodatages, jours de séance, clôtures et clôtures ajustées des dividendes. */
+              static class Serie {
+                  final ArrayList<Long> t = new ArrayList<>();
+                  final ArrayList<String> j = new ArrayList<>();
+                  final ArrayList<Double> c = new ArrayList<>();
+                  final ArrayList<Double> a = new ArrayList<>();
+                  double dernier() { return c.get(c.size() - 1); }
+                  String jour() { return j.get(j.size() - 1); }
+                  Double variation() { int n = c.size(); return n > 1 ? (c.get(n - 1) / c.get(n - 2) - 1) * 100 : null; }
+              }
+
+              static String lire(String url) throws Exception {
+                  java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+                  c.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+                  c.setConnectTimeout(15000);
+                  c.setReadTimeout(20000);
+                  int statut = c.getResponseCode();
+                  if (statut != 200) throw new Exception("Yahoo a répondu " + statut);
+                  try (java.io.InputStream in = c.getInputStream()) {
+                      java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream();
+                      byte[] buf = new byte[8192];
+                      int n;
+                      while ((n = in.read(buf)) > 0) o.write(buf, 0, n);
+                      return o.toString("UTF-8");
+                  }
+              }
+
+              static Serie charger(String symbole, String periode) throws Exception {
+                  String chemin = "/v8/finance/chart/" + symbole + "?range=" + periode + "&interval=1d&includePrePost=false&events=div%2Csplits";
+                  String corps;
+                  try { corps = lire("https://query1.finance.yahoo.com" + chemin); }
+                  catch (Exception e) { corps = lire("https://query2.finance.yahoo.com" + chemin); }
+                  return lireSerie(corps, symbole);
+              }
+
+              /** Même lecture que l'écran : on saute les cours vides, une séance en double garde la plus récente. */
+              static Serie lireSerie(String corps, String symbole) throws Exception {
+                  JSONObject chart;
+                  try { chart = new JSONObject(corps).getJSONObject("chart"); }
+                  catch (Exception e) { throw new Exception(symbole + " : réponse illisible (" + corps.substring(0, Math.min(120, corps.length())) + ")"); }
+                  JSONArray resultats = chart.optJSONArray("result");
+                  if (resultats == null || resultats.optJSONObject(0) == null) {
+                      JSONObject err = chart.optJSONObject("error");
+                      throw new Exception(symbole + " : " + (err != null ? err.optString("description", "aucune donnée") : "aucune donnée"));
+                  }
+                  JSONObject r = resultats.getJSONObject(0);
+                  JSONObject meta = r.optJSONObject("meta");
+                  long decalage = meta != null ? meta.optLong("gmtoffset", 0) : 0;
+                  JSONArray ts = r.optJSONArray("timestamp");
+                  JSONObject ind = r.getJSONObject("indicators");
+                  JSONArray cl = ind.getJSONArray("quote").getJSONObject(0).getJSONArray("close");
+                  JSONArray liste = ind.optJSONArray("adjclose");
+                  JSONArray adj = liste != null && liste.optJSONObject(0) != null ? liste.optJSONObject(0).optJSONArray("adjclose") : null;
+                  Serie s = new Serie();
+                  for (int i = 0; ts != null && i < ts.length(); i++) {
+                      double v = cl.optDouble(i, Double.NaN);
+                      if (Double.isNaN(v) || v <= 0) continue;
+                      double va = adj != null ? adj.optDouble(i, v) : v;
+                      if (Double.isNaN(va) || va <= 0) va = v;
+                      long t = ts.getLong(i);
+                      String jour = java.time.Instant.ofEpochSecond(t + decalage + 6 * 3600).toString().substring(0, 10);
+                      int n = s.j.size();
+                      if (n > 0 && s.j.get(n - 1).equals(jour)) { s.t.remove(n - 1); s.j.remove(n - 1); s.c.remove(n - 1); s.a.remove(n - 1); }
+                      s.t.add(t);
+                      s.j.add(jour);
+                      s.c.add(v);
+                      s.a.add(va);
+                  }
+                  if (s.c.isEmpty()) throw new Exception(symbole + " : aucun cours");
+                  return s;
+              }
+
+              /** Même calcul que l'écran : VL connue × variation de l'action Zurich en euros (cours ajusté du jour de la VL). */
+              static Double estimerVL(Serie novn, Serie fx, double vlRef, String jourRef) {
+                  int k = -1;
+                  for (int i = 0; i < novn.j.size(); i++) { if (novn.j.get(i).compareTo(jourRef) <= 0) k = i; else break; }
+                  if (k < 0) return null;
+                  Double fxRef = null;
+                  for (int i = 0; i < fx.t.size(); i++) { if (fx.t.get(i) <= novn.t.get(k) + 6 * 3600) fxRef = fx.c.get(i); else break; }
+                  if (fxRef == null) return null;
+                  return vlRef * (novn.dernier() / fx.dernier()) / (novn.a.get(k) / fxRef);
+              }
+
+              static boolean atteint(double valeur, double seuil, boolean bas) { return bas ? valeur <= seuil : valeur >= seuil; }
+
+              static boolean rearme(double valeur, double seuil, boolean bas) { return bas ? valeur > seuil * 1.005 : valeur < seuil * 0.995; }
+
+              static synchronized void verifier(Context c, boolean force) throws Exception {
+                  SharedPreferences sp = prefs(c);
+                  JSONObject cfg = new JSONObject(sp.getString("config", "{}"));
+                  if (!force && !cfg.optBoolean("actif", false)) return;
+                  java.time.ZonedDateTime m = java.time.ZonedDateTime.now(java.time.ZoneId.of("Europe/Paris"));
+                  int minutes = m.getHour() * 60 + m.getMinute();
+                  if (!force && (m.getDayOfWeek().getValue() >= 6 || minutes < 8 * 60 + 45 || minutes > 22 * 60 + 30)) return; // Bourses fermées
+                  double vlRef = cfg.optDouble("vlRef", 0);
+                  String jourRef = cfg.optString("vlDate", "");
+                  boolean avecVL = vlRef > 0 && jourRef.length() == 10;
+                  String periode = "5d";
+                  if (avecVL) {
+                      long age = java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.parse(jourRef), java.time.LocalDate.now());
+                      periode = age <= 80 ? "3mo" : (age <= 350 ? "1y" : "2y");
+                  }
+                  StringBuilder bilan = new StringBuilder(heure());
+                  Serie novn = charger("NOVN.SW", periode);
+                  if (avecVL) {
+                      Double vl = estimerVL(novn, charger("EURCHF=X", periode), vlRef, jourRef);
+                      if (vl != null) {
+                          bilan.append(" · VL ≈ ").append(nombre(vl)).append(" €");
+                          seuil(c, sp, cfg, "vlBas", vl, true, "VL du FCPE", "€", 101);
+                          seuil(c, sp, cfg, "vlHaut", vl, false, "VL du FCPE", "€", 102);
+                      } else bilan.append(" · VL : date de ta VL trop ancienne");
+                  }
+                  Serie nvs = charger("NVS", "5d");
+                  bilan.append(" · NVS ").append(nombre(nvs.dernier())).append(" $");
+                  seuil(c, sp, cfg, "nvsBas", nvs.dernier(), true, "NVS", "$", 103);
+                  seuil(c, sp, cfg, "nvsHaut", nvs.dernier(), false, "NVS", "$", 104);
+                  mouvement(c, sp, cfg, "novn", "Novartis à Zurich", novn, 105);
+                  mouvement(c, sp, cfg, "nvs", "NVS à New York", nvs, 106);
+                  sp.edit().putString("bilan", bilan.toString()).putString("erreur", "").putString("dejaSignale", "").apply();
+              }
+
+              /** Prévient une fois quand la valeur passe le seuil ; se réarme quand elle repart de plus de 0,5 % dans l'autre sens. */
+              static void seuil(Context c, SharedPreferences sp, JSONObject cfg, String cle, double valeur, boolean bas, String quoi, String unite, int id) {
+                  double limite = cfg.optDouble(cle, 0);
+                  if (!(limite > 0)) return;
+                  boolean dit = sp.getBoolean("dit_" + cle, false);
+                  if (!dit && atteint(valeur, limite, bas)) {
+                      notifier(c, id, quoi + (bas ? " sous " : " au-dessus de ") + nombre(limite) + " " + unite, "Maintenant : " + nombre(valeur) + " " + unite + ".");
+                      sp.edit().putBoolean("dit_" + cle, true).apply();
+                  } else if (dit && rearme(valeur, limite, bas)) {
+                      sp.edit().putBoolean("dit_" + cle, false).apply();
+                  }
+              }
+
+              /** Grosse variation sur la séance : une seule alerte par séance et par Bourse. */
+              static void mouvement(Context c, SharedPreferences sp, JSONObject cfg, String cle, String nom, Serie s, int id) {
+                  double limite = cfg.optDouble("variation", 0);
+                  Double v = s.variation();
+                  if (!(limite > 0) || v == null || Math.abs(v) < limite) return;
+                  if (s.jour().equals(sp.getString("jour_" + cle, ""))) return;
+                  String jour = s.jour().substring(8, 10) + "/" + s.jour().substring(5, 7);
+                  notifier(c, id, nom + " : " + (v > 0 ? "+" : "") + nombre(v) + " %", "Séance du " + jour + ". Ton seuil : ±" + nombre(limite) + " %.");
+                  sp.edit().putString("jour_" + cle, s.jour()).apply();
+              }
+
+              static void notifier(Context c, int id, String titre, String texte) {
+                  NotificationManager nm = c.getSystemService(NotificationManager.class);
+                  if (nm == null) return;
+                  nm.createNotificationChannel(new NotificationChannel(CANAL, "Alertes de cours", NotificationManager.IMPORTANCE_HIGH));
+                  Intent i = new Intent(c, MainActivity.class).setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                  nm.notify(id, new Notification.Builder(c, CANAL)
+                          .setSmallIcon(android.R.drawable.ic_dialog_info)
+                          .setContentTitle(titre)
+                          .setContentText(texte)
+                          .setStyle(new Notification.BigTextStyle().bigText(texte))
+                          .setAutoCancel(true)
+                          .setContentIntent(PendingIntent.getActivity(c, id, i, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT))
+                          .build());
+              }
+
+              /** Une erreur de la veille part au mouchard de Playstoore (une seule fois par erreur différente). */
+              static void signaler(Context c, String texte) {
+                  try {
+                      Intent i = new Intent("fr.hack68.playstoore.ERREUR");
+                      i.setPackage("fr.hack68.playstoore");
+                      i.putExtra("paquet", c.getPackageName());
+                      i.putExtra("texte", "Veille des alertes en arrière-plan : " + texte);
+                      c.sendBroadcast(i);
+                  } catch (Exception ignore) { }
+              }
+          }
+          EOF_9
           cp signature.keystore app/signature.keystore
           mkdir -p app/src/main/assets
           cp index.html app/src/main/assets/index.html

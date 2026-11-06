@@ -42,6 +42,11 @@ td small{display:block;color:var(--doux);font-size:.74rem}
 .actu b{display:block;font-size:.92rem;line-height:1.3;font-weight:600}
 .note{font-size:.78rem;color:var(--doux);margin-top:10px}
 #controle{font-size:.78rem;color:var(--doux);padding:12px 2px;text-align:center}
+.case{display:flex;gap:10px;align-items:flex-start;font-size:.92rem;line-height:1.35}
+.case input{width:22px;height:22px;flex:none;margin:1px 0 0}
+.boutons{display:flex;gap:10px;margin-top:12px}
+.boutons button{flex:1}
+button.secondaire{background:var(--bord);color:var(--txt)}
 </style>
 </head>
 <body>
@@ -87,6 +92,22 @@ td small{display:block;color:var(--doux);font-size:.74rem}
     <div class="titre">Test honnête sur 5 ans</div>
     <div id="backtest" class="doux">—</div>
     <div class="note">Cours ajustés (dividendes compris), ordre passé à la clôture du lendemain du signal, 0,2&nbsp;% de frais par ordre, hors impôts. Le passé ne garantit rien pour la suite.</div>
+  </section>
+
+  <section class="carte large">
+    <div class="titre">Mes alertes</div>
+    <label class="case"><input type="checkbox" id="alertesActives"><span>Me prévenir même appli fermée (contrôle toutes les 30 min, du lundi au vendredi de 8 h 45 à 22 h 30)</span></label>
+    <div class="champs">
+      <label>VL sous (€)<input type="text" inputmode="decimal" id="alVlBas" placeholder="ex. 100"></label>
+      <label>VL au-dessus de (€)<input type="text" inputmode="decimal" id="alVlHaut" placeholder="ex. 120"></label>
+      <label>NVS sous ($)<input type="text" inputmode="decimal" id="alNvsBas" placeholder="ex. 95"></label>
+      <label>NVS au-dessus de ($)<input type="text" inputmode="decimal" id="alNvsHaut" placeholder="ex. 130"></label>
+      <label class="plein">Mouvement sur la séance de plus de (± %), Zurich ou New York<input type="text" inputmode="decimal" id="alVariation" placeholder="ex. 3"></label>
+    </div>
+    <div class="boutons"><button id="enregistrerAlertes">Enregistrer</button><button id="testerAlertes" class="secondaire">Tester</button></div>
+    <div id="alMessage" class="note"></div>
+    <div id="alEtat" class="note"></div>
+    <div class="note">Chaque alerte prévient une fois quand le seuil est franchi, puis se réarme quand le cours repart dans l’autre sens. La VL est estimée comme en haut de l’écran. Android peut retarder un contrôle quand le téléphone dort.</div>
   </section>
 
   <section class="carte large">
@@ -590,9 +611,78 @@ function afficherActus() {
 }
 
 function toutAfficher() {
-  [afficherFCPE, afficherCours, afficherReperes, afficherBacktest, dessiner, afficherActus].forEach(sur);
+  [afficherFCPE, afficherCours, afficherReperes, afficherBacktest, dessiner, afficherActus, afficherAlertes].forEach(sur);
   maj(etatEntete());
 }
+
+// ---------- Alertes (1.2) : la veille Android vérifie les cours toutes les 30 min, même appli fermée ----------
+const CLE_ALERTES = 'novartis.alertes';
+const CHAMPS_ALERTES = [['vlBas', 'alVlBas', 'VL sous'], ['vlHaut', 'alVlHaut', 'VL au-dessus'], ['nvsBas', 'alNvsBas', 'NVS sous'], ['nvsHaut', 'alNvsHaut', 'NVS au-dessus'], ['variation', 'alVariation', 'Mouvement du jour']];
+// mêmes règles que la veille Android (VeilleJob.java)
+function seuilAtteint(valeur, seuil, bas) { return bas ? valeur <= seuil : valeur >= seuil; }
+function mouvementAlerte(variationPct, seuilPct) { return Math.abs(variationPct) >= seuilPct; }
+function lireAlertes() { return lireJSON(CLE_ALERTES) || { actif: false }; }
+function remplirAlertes() {
+  const al = lireAlertes();
+  id('alertesActives').checked = !!al.actif;
+  CHAMPS_ALERTES.forEach(([cle, champ]) => { id(champ).value = al[cle] ? String(al[cle]).replace('.', ',') : ''; });
+}
+function envoyerAlertes() {
+  if (!(A && A.configurerAlertes)) return;
+  A.configurerAlertes(JSON.stringify(Object.assign({}, lireAlertes(), { vlRef: lireNombre(localStorage.getItem(CLE.vlRef)), vlDate: localStorage.getItem(CLE.vlDate) || '' })));
+}
+function afficherAlertes() {
+  const al = lireAlertes(), d = etat.donnees || {}, lignes = [], deja = [];
+  const vlRef = lireNombre(localStorage.getItem(CLE.vlRef)), vlDate = localStorage.getItem(CLE.vlDate);
+  const r = vlRef && vlDate && d.novn && d.eurchf ? calculFCPE(d, vlRef, vlDate) : null;
+  const vl = r && !r.erreur ? r.vl : null, nvs = d.nvs ? dernier(d.nvs.c) : null;
+  if (vl != null && al.vlBas && seuilAtteint(vl, al.vlBas, true)) deja.push('VL sous ' + formaterNombre(al.vlBas) + '\u00a0€');
+  if (vl != null && al.vlHaut && seuilAtteint(vl, al.vlHaut, false)) deja.push('VL au-dessus de ' + formaterNombre(al.vlHaut) + '\u00a0€');
+  if (nvs != null && al.nvsBas && seuilAtteint(nvs, al.nvsBas, true)) deja.push('NVS sous ' + formaterNombre(al.nvsBas) + '\u00a0$');
+  if (nvs != null && al.nvsHaut && seuilAtteint(nvs, al.nvsHaut, false)) deja.push('NVS au-dessus de ' + formaterNombre(al.nvsHaut) + '\u00a0$');
+  if (al.variation && [d.novn, d.nvs].some((s) => s && variationJour(s) != null && mouvementAlerte(variationJour(s), al.variation))) deja.push('mouvement de plus de ' + formaterNombre(al.variation, 1) + '\u00a0% sur la séance');
+  if (al.actif && deja.length) lignes.push('Déjà atteint maintenant : ' + deja.join(', ') + '. La veille ne prévient qu’une fois par franchissement.');
+  if (A && A.etatAlertes) {
+    let e = {};
+    try { e = JSON.parse(A.etatAlertes()) || {}; } catch (err) { }
+    if (al.actif && e.notifications === false) lignes.push('⚠️ Notifications bloquées : autorise-les dans les réglages Android de l’appli.');
+    if (al.actif && e.planifie === false) lignes.push('⚠️ La veille n’est pas programmée : touche Enregistrer.');
+    if (e.bilan) lignes.push('Dernier contrôle : ' + e.bilan + '.');
+    if (e.erreur) lignes.push('Dernière erreur de la veille : ' + e.erreur);
+  } else lignes.push('Les alertes marchent seulement dans l’appli, sur le téléphone.');
+  id('alEtat').innerHTML = lignes.map(echapper).join('<br>');
+}
+id('enregistrerAlertes').onclick = () => {
+  const msg = (t) => { id('alMessage').textContent = t; };
+  const al = { actif: id('alertesActives').checked };
+  for (const [cle, champ, nom] of CHAMPS_ALERTES) {
+    const texte = id(champ).value.trim();
+    if (texte === '') { al[cle] = null; continue; }
+    const v = lireNombre(texte);
+    if (v == null || v <= 0) return msg('«\u00a0' + nom + '\u00a0» : écris un nombre, par exemple 105,5');
+    al[cle] = v;
+  }
+  if (al.vlBas && al.vlHaut && al.vlBas >= al.vlHaut) return msg('Le seuil «\u00a0VL sous\u00a0» doit être plus petit que «\u00a0VL au-dessus\u00a0».');
+  if (al.nvsBas && al.nvsHaut && al.nvsBas >= al.nvsHaut) return msg('Le seuil «\u00a0NVS sous\u00a0» doit être plus petit que «\u00a0NVS au-dessus\u00a0».');
+  if (al.actif && !CHAMPS_ALERTES.some(([cle]) => al[cle])) return msg('Mets au moins un seuil, ou décoche la case.');
+  localStorage.setItem(CLE_ALERTES, JSON.stringify(al));
+  envoyerAlertes();
+  if (A && A.vibrer) A.vibrer(30);
+  msg(al.actif ? 'Enregistré ✓ La veille tourne, même appli fermée.' : 'Enregistré ✓ Veille arrêtée.');
+  sur(afficherAlertes);
+};
+id('testerAlertes').onclick = () => {
+  if (!(A && A.testerAlertes)) { id('alMessage').textContent = 'Le test marche seulement dans l’appli, sur le téléphone.'; return; }
+  id('alMessage').textContent = 'Test en cours…';
+  A.testerAlertes();
+};
+window.__alertesTestees = (r) => {
+  if (r === 'ok') id('alMessage').textContent = 'Test fait ✓ Tu as dû recevoir une notification, et les cours ont bien été vérifiés.';
+  else { id('alMessage').textContent = 'La notification de test est partie, mais la vérification des cours a échoué : ' + r; console.error('Test des alertes : ' + r); }
+  sur(afficherAlertes);
+};
+remplirAlertes();
+envoyerAlertes();
 
 // ---------- Mise à jour des cours ----------
 async function actualiser() {
@@ -647,6 +737,8 @@ id('enregistrerVL').onclick = () => {
   msg('Enregistré ✓');
   remplirChamps();
   sur(afficherFCPE);
+  envoyerAlertes(); // la veille Android prend la nouvelle VL
+  sur(afficherAlertes);
 };
 id('actus').addEventListener('click', (e) => {
   const el = e.target.closest('[data-i]'), a = etat.donnees && etat.donnees.actus;
@@ -696,6 +788,9 @@ function controleQualite() {
     ['Revente à 121 avec 1 % de frais par ordre → +18,59 %', () => backtest([100, 100, 110, 121, 110], [1, 1, 0, 0, 0], 0.01).gainPct, 18.59],
     ['Pire chute 120 → 90 = −25 %', () => backtest([100, 120, 90, 130, 104], [1, 1, 1, 1, 1], 0).pireChutePct, -25],
     ['+21 % en 2 ans = +10 % par an', () => parAn(1.21, 2), 10],
+    ['Alerte « VL sous 105 € » avec une VL à 104,90 € → atteinte', () => seuilAtteint(104.9, 105, true), true],
+    ['Alerte « NVS au-dessus de 110 $ » à 109,99 $ → pas encore', () => seuilAtteint(109.99, 110, false), false],
+    ['Mouvement de −3,2 % avec un seuil de ±3 % → alerte', () => mouvementAlerte(-3.2, 3), true],
   ];
   const ko = [];
   for (const [nom, f, attendu] of cas) {
