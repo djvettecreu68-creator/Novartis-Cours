@@ -69,6 +69,7 @@ button.secondaire{background:var(--bord);color:var(--txt)}
       <label>Date de ta dernière VL<input type="date" id="vlDate"></label>
       <label>VL de ce jour-là (€)<input type="text" inputmode="decimal" id="vlRef" placeholder="ex. 109,657"></label>
       <label class="plein">Nombre de parts (facultatif)<input type="text" inputmode="decimal" id="parts" placeholder="ex. 152,3846"></label>
+      <label class="plein">Prix de revient (VL d'achat en €)<input type="text" inputmode="decimal" id="vlAchat" placeholder="ex. 100"></label>
     </div>
     <button id="enregistrerVL" style="margin-top:12px;width:100%">Enregistrer</button>
     </div>
@@ -280,7 +281,7 @@ const A = window.Android; // absent quand la page est ouverte dans un navigateur
 const DANS_APPLI = !!(A && A.lireTexte);
 const SEANCES_AN = 252;
 const FRAIS = 0.002; // 0,2 % de frais par ordre dans le test sur 5 ans
-const CLE = { donnees: 'novartis.v4.donnees', vlRef: 'novartis.vlRef', vlDate: 'novartis.vlDate', parts: 'novartis.parts', controle: 'novartis.controleVL' };
+const CLE = { donnees: 'novartis.v4.donnees', vlRef: 'novartis.vlRef', vlDate: 'novartis.vlDate', parts: 'novartis.parts', vlAchat: 'novartis.vlAchat', controle: 'novartis.controleVL' };
 const etat = { donnees: null, enCours: false, pointe: null, graphe: null, erreurs: [] };
 const id = (x) => document.getElementById(x);
 
@@ -510,10 +511,11 @@ function etatEntete() {
 }
 
 function remplirChamps() {
-  const v = localStorage.getItem(CLE.vlRef), p = localStorage.getItem(CLE.parts);
+  const v = localStorage.getItem(CLE.vlRef), p = localStorage.getItem(CLE.parts), a = localStorage.getItem(CLE.vlAchat);
   id('vlRef').value = v ? String(v).replace('.', ',') : '';
   id('vlDate').value = localStorage.getItem(CLE.vlDate) || '';
   id('parts').value = p ? String(p).replace('.', ',') : '';
+  id('vlAchat').value = a ? String(a).replace('.', ',') : '';
 }
 
 function afficherFCPE() {
@@ -528,7 +530,14 @@ function afficherFCPE() {
   const r = calculFCPE(d, vlRef, vlDate);
   if (r.erreur) return vide(r.erreur);
   id('vlEstimee').textContent = formaterNombre(r.vl) + '\u00a0€';
-  id('vlVariation').innerHTML = '<span class="' + classe(r.variationPct) + '">' + pct(r.variationPct, 2) + '</span> depuis ta VL du ' + dateFR(vlDate) + ' (' + formaterNombre(vlRef, 3) + '\u00a0€)';
+  let varHtml = '<span class="' + classe(r.variationPct) + '">' + pct(r.variationPct, 2) + '</span> depuis ta VL du ' + dateFR(vlDate) + ' (' + formaterNombre(vlRef, 3) + '\u00a0€)';
+  const vlAchat = lireNombre(localStorage.getItem(CLE.vlAchat));
+  if (vlAchat) {
+    const vp = (r.vl / vlAchat - 1) * 100;
+    const gain = parts ? parts * (r.vl - vlAchat) : null;
+    varHtml += '<br><span class="' + classe(vp) + '">' + pct(vp, 2) + '</span> depuis l\'achat (' + formaterNombre(vlAchat) + '\u00a0€)' + (gain ? ' — <b>' + (gain > 0 ? '+' : '') + formaterNombre(gain) + '\u00a0€</b>' : '');
+  }
+  id('vlVariation').innerHTML = varHtml;
   id('vlTotal').innerHTML = parts ? 'Mes ' + formaterNombre(parts, 4) + ' parts ≈ <b>' + formaterNombre(parts * r.vl) + '\u00a0€</b> <span style="white-space:nowrap" class="' + classe(r.vl - vlRef) + '">('
     + (r.vl >= vlRef ? '+' : '') + formaterNombre(parts * (r.vl - vlRef)) + '\u00a0€)</span>' : '';
 }
@@ -653,12 +662,16 @@ function majWidgetAppli() {
     const vlRef = lireNombre(localStorage.getItem(CLE.vlRef)), vlDate = localStorage.getItem(CLE.vlDate);
     const r = vlRef && vlDate && d.novn && d.eurchf ? calculFCPE(d, vlRef, vlDate) : null;
     const v = d.novn ? directionCT(d.novn.a) : null;
+    const vlAchat = lireNombre(localStorage.getItem(CLE.vlAchat));
     
-    let vlTxt = '— €', varTxt = '', varCls = 'doux';
+    let vlTxt = '— €', varTxt = '', varCls = 'doux', achatTxt = '';
+    if (vlAchat) achatTxt = 'Achat : ' + formaterNombre(vlAchat) + ' €';
     if (r && !r.erreur) {
       vlTxt = formaterNombre(r.vl) + ' €';
-      varTxt = pct(r.variationPct, 2);
-      varCls = r.variationPct > 0 ? 'vert' : (r.variationPct < 0 ? 'rouge' : 'doux');
+      let vp = r.variationPct;
+      if (vlAchat) vp = (r.vl / vlAchat - 1) * 100;
+      varTxt = pct(vp, 2);
+      varCls = vp > 0 ? 'vert' : (vp < 0 ? 'rouge' : 'doux');
     }
     
     const al = lireAlertes();
@@ -686,7 +699,7 @@ function majWidgetAppli() {
        }
     }
     
-    A.majWidget(JSON.stringify({ vl: vlTxt, var: varTxt, varCls: varCls, alerte: alTxt, dirTitre: dirTitre, dirTexte: dirTexte, f1: f1, f5: f5, c1: c1, c2: c2, c3: c3, c4: c4, quand: d.quand ? quand(d.quand) : '' }));
+    A.majWidget(JSON.stringify({ vl: vlTxt, var: varTxt, varCls: varCls, achat: achatTxt, alerte: alTxt, dirTitre: dirTitre, dirTexte: dirTexte, f1: f1, f5: f5, c1: c1, c2: c2, c3: c3, c4: c4, quand: d.quand ? quand(d.quand) : '' }));
   } catch (e) { console.error('Widget : ' + ((e && e.stack) || e)); }
 }
 
@@ -709,7 +722,11 @@ function remplirAlertes() {
 }
 function envoyerAlertes() {
   if (!(A && A.configurerAlertes)) return;
-  A.configurerAlertes(JSON.stringify(Object.assign({}, lireAlertes(), { vlRef: lireNombre(localStorage.getItem(CLE.vlRef)), vlDate: localStorage.getItem(CLE.vlDate) || '' })));
+  A.configurerAlertes(JSON.stringify(Object.assign({}, lireAlertes(), { 
+    vlRef: lireNombre(localStorage.getItem(CLE.vlRef)), 
+    vlDate: localStorage.getItem(CLE.vlDate) || '',
+    vlAchat: lireNombre(localStorage.getItem(CLE.vlAchat))
+  })));
 }
 function afficherAlertes() {
   const al = lireAlertes(), d = etat.donnees || {}, lignes = [], deja = [];
@@ -1030,6 +1047,8 @@ id('enregistrerVL').onclick = () => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(jour)) return msg('Choisis la date de cette VL.');
   if (jour > aujourdhui()) return msg('La date de la VL ne peut pas être dans le futur.');
   if (texteParts !== '' && (p == null || p < 0)) return msg('Nombre de parts invalide : écris par exemple 152,3846');
+  const vlAchat = lireNombre(id('vlAchat').value);
+  if (id('vlAchat').value.trim() !== '' && (vlAchat == null || vlAchat <= 0)) return msg('Prix de revient invalide : écris par exemple 100');
   // contrôle : ce que l’appli avait estimé pour cette nouvelle date, à partir de l’ancienne VL
   const ancienneV = lireNombre(localStorage.getItem(CLE.vlRef)), ancienneD = localStorage.getItem(CLE.vlDate), d = etat.donnees;
   if (ancienneV && ancienneD && jour > ancienneD && d && d.novn && d.eurchf) {
@@ -1042,6 +1061,7 @@ id('enregistrerVL').onclick = () => {
   localStorage.setItem(CLE.vlRef, String(v));
   localStorage.setItem(CLE.vlDate, jour);
   if (p == null) localStorage.removeItem(CLE.parts); else localStorage.setItem(CLE.parts, String(p));
+  if (vlAchat == null) localStorage.removeItem(CLE.vlAchat); else localStorage.setItem(CLE.vlAchat, String(vlAchat));
   if (A && A.vibrer) A.vibrer(30);
   msg('Enregistré ✓');
   remplirChamps();

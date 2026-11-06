@@ -577,10 +577,13 @@ jobs:
               /** Écrit dans le widget ce qu'il doit afficher : VL, direction, fourchettes, indicateurs. */
               static void enregistrerWidget(Context c, Serie novn, Serie nvs, Double vl, JSONObject cfg) {
                   try {
-                      String vlTxt = "— €", varTxt = "", varCls = "doux", alTxt = "", dirTitre = "", dirTexte = "", c1 = "", c2 = "", c3 = "", c4 = "", f1 = "", f5 = "";
+                      String vlTxt = "— €", varTxt = "", varCls = "doux", achatTxt = "", alTxt = "", dirTitre = "", dirTexte = "", c1 = "", c2 = "", c3 = "", c4 = "", f1 = "", f5 = "";
+                      double vlAchat = cfg.optDouble("vlAchat", 0);
+                      if (vlAchat > 0) achatTxt = "Achat : " + nombre(vlAchat) + " €";
+                      
                       if (vl != null) {
                           vlTxt = nombre(vl) + " €";
-                          double vRef = cfg.optDouble("vlRef", 0);
+                          double vRef = vlAchat > 0 ? vlAchat : cfg.optDouble("vlRef", 0);
                           if (vRef > 0) {
                               double var = (vl / vRef - 1) * 100;
                               varTxt = String.format(Locale.FRANCE, "%+.2f %%", var);
@@ -634,7 +637,7 @@ jobs:
                       }
 
                       JSONObject w = new JSONObject();
-                      w.put("vl", vlTxt); w.put("var", varTxt); w.put("varCls", varCls);
+                      w.put("vl", vlTxt); w.put("var", varTxt); w.put("varCls", varCls); w.put("achat", achatTxt);
                       w.put("alerte", alTxt); w.put("dirTitre", dirTitre); w.put("dirTexte", dirTexte);
                       w.put("f1", f1); w.put("f5", f5); w.put("c1", c1); w.put("c2", c2); w.put("c3", c3); w.put("c4", c4);
                       w.put("quand", heure() + " · Toucher pour actualiser");
@@ -798,6 +801,15 @@ jobs:
                   android:textSize="11sp" />
 
               <TextView
+                  android:id="@+id/w_achat"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:text="Achat : 100,00 €"
+                  android:textColor="#80FFFFFF"
+                  android:textSize="10sp"
+                  android:textStyle="italic" />
+
+              <TextView
                   android:id="@+id/w_c1"
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
@@ -925,6 +937,7 @@ jobs:
                           v.setTextViewText(R.id.w_dirTexte, "pour voir les cours");
                           v.setTextViewText(R.id.w_f1, "");
                           v.setTextViewText(R.id.w_f5, "");
+                          v.setTextViewText(R.id.w_achat, "");
                           v.setTextViewText(R.id.w_c1, "");
                           v.setTextViewText(R.id.w_c2, "");
                           v.setTextViewText(R.id.w_c3, "");
@@ -944,6 +957,7 @@ jobs:
                           v.setTextViewText(R.id.w_dirTexte, d.optString("dirTexte", ""));
                           v.setTextViewText(R.id.w_f1, d.optString("f1", ""));
                           v.setTextViewText(R.id.w_f5, d.optString("f5", ""));
+                          v.setTextViewText(R.id.w_achat, d.optString("achat", ""));
                           v.setTextViewText(R.id.w_c1, d.optString("c1", ""));
                           v.setTextViewText(R.id.w_c2, d.optString("c2", ""));
                           v.setTextViewText(R.id.w_c3, d.optString("c3", ""));
@@ -958,6 +972,7 @@ jobs:
                       v.setTextViewText(R.id.w_dirTexte, "");
                       v.setTextViewText(R.id.w_f1, "");
                       v.setTextViewText(R.id.w_f5, "");
+                      v.setTextViewText(R.id.w_achat, "");
                       v.setTextViewText(R.id.w_c1, "");
                       v.setTextViewText(R.id.w_c2, "");
                       v.setTextViewText(R.id.w_c3, "");
@@ -977,6 +992,7 @@ jobs:
                   v.setOnClickPendingIntent(R.id.w_dirTexte, pi);
                   v.setOnClickPendingIntent(R.id.w_f1, pi);
                   v.setOnClickPendingIntent(R.id.w_f5, pi);
+                  v.setOnClickPendingIntent(R.id.w_achat, pi);
                   v.setOnClickPendingIntent(R.id.w_c1, pi);
                   v.setOnClickPendingIntent(R.id.w_c2, pi);
                   v.setOnClickPendingIntent(R.id.w_c3, pi);
