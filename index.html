@@ -668,16 +668,18 @@ function majWidgetAppli() {
     const v = d.novn ? directionCT(d.novn.a) : null;
     const vlAchat = lireNombre(localStorage.getItem(CLE.vlAchat));
     
-    let vlTxt = '— €', varTxt = '', varCls = 'doux', achatTxt = '';
+    let vlTxt = '— €', varTxt = '', varCls = 'doux', achatTxt = '', achatVar = '', achatCls = 'doux';
     const parts = lireNombre(localStorage.getItem(CLE.parts));
     if (r && !r.erreur) {
       vlTxt = formaterNombre(r.vl) + ' €';
-      varTxt = pct(r.variationPct, 2); // Variation par rapport à la dernière VL
+      varTxt = pct(r.variationPct, 2);
       varCls = r.variationPct > 0 ? 'vert' : (r.variationPct < 0 ? 'rouge' : 'doux');
       if (vlAchat) {
         const vp = (r.vl / vlAchat - 1) * 100;
         const gain = parts ? parts * (r.vl - vlAchat) : null;
-        achatTxt = 'Achat : ' + formaterNombre(vlAchat) + ' € (' + pct(vp, 2) + (gain ? ' · ' + (gain > 0 ? '+' : '') + formaterNombre(gain) + ' €' : '') + ')';
+        achatTxt = 'Achat : ' + formaterNombre(vlAchat) + ' €';
+        achatVar = '(' + pct(vp, 2) + (gain ? ' · ' + (gain > 0 ? '+' : '') + formaterNombre(gain) + ' €' : '') + ')';
+        achatCls = vp > 0 ? 'vert' : (vp < 0 ? 'rouge' : 'doux');
       }
     }
     
@@ -706,7 +708,7 @@ function majWidgetAppli() {
        }
     }
     
-    A.majWidget(JSON.stringify({ vl: vlTxt, var: varTxt, varCls: varCls, achat: achatTxt, alerte: alTxt, dirTitre: dirTitre, dirTexte: dirTexte, f1: f1, f5: f5, c1: c1, c2: c2, c3: c3, c4: c4, quand: d.quand ? quand(d.quand) : '' }));
+    A.majWidget(JSON.stringify({ vl: vlTxt, var: varTxt, varCls: varCls, achat: achatTxt, achatVar: achatVar, achatCls: achatCls, alerte: alTxt, dirTitre: dirTitre, dirTexte: dirTexte, f1: f1, f5: f5, c1: c1, c2: c2, c3: c3, c4: c4, quand: d.quand ? quand(d.quand) : '' }));
   } catch (e) { console.error('Widget : ' + ((e && e.stack) || e)); }
 }
 

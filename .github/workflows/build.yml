@@ -580,6 +580,7 @@ jobs:
                       String vlTxt = "— €", varTxt = "", varCls = "doux", achatTxt = "", alTxt = "", dirTitre = "", dirTexte = "", c1 = "", c2 = "", c3 = "", c4 = "", f1 = "", f5 = "";
                       double vlAchat = cfg.optDouble("vlAchat", 0);
                       double vlRef = cfg.optDouble("vlRef", 0);
+                      String achatVar = "", achatCls = "doux";
                       
                       if (vl != null) {
                           vlTxt = nombre(vl) + " €";
@@ -594,7 +595,9 @@ jobs:
                           }
                           if (vlAchat > 0) {
                               double varA = (vl / vlAchat - 1) * 100;
-                              achatTxt = "Achat : " + nombre(vlAchat) + " € (" + String.format(Locale.FRANCE, "%+.2f %%", varA) + ")";
+                              achatTxt = "Achat : " + nombre(vlAchat) + " €";
+                              achatVar = "(" + String.format(Locale.FRANCE, "%+.2f %%", varA) + ")";
+                              achatCls = varA > 0 ? "vert" : (varA < 0 ? "rouge" : "doux");
                           }
                       }
                       
@@ -644,7 +647,8 @@ jobs:
                       }
 
                       JSONObject w = new JSONObject();
-                      w.put("vl", vlTxt); w.put("var", varTxt); w.put("varCls", varCls); w.put("achat", achatTxt);
+                      w.put("vl", vlTxt); w.put("var", varTxt); w.put("varCls", varCls); 
+                      w.put("achat", achatTxt); w.put("achatVar", achatVar); w.put("achatCls", achatCls);
                       w.put("alerte", alTxt); w.put("dirTitre", dirTitre); w.put("dirTexte", dirTexte);
                       w.put("f1", f1); w.put("f5", f5); w.put("c1", c1); w.put("c2", c2); w.put("c3", c3); w.put("c4", c4);
                       w.put("quand", heure() + " · Toucher pour actualiser");
@@ -807,14 +811,28 @@ jobs:
                   android:textColor="#E0FFFFFF"
                   android:textSize="11sp" />
 
-              <TextView
-                  android:id="@+id/w_achat"
+              <LinearLayout
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
-                  android:text="Achat : 100,00 €"
-                  android:textColor="#80FFFFFF"
-                  android:textSize="10sp"
-                  android:textStyle="italic" />
+                  android:orientation="horizontal">
+                  <TextView
+                      android:id="@+id/w_achat"
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:text="Achat : 100,00 €"
+                      android:textColor="#80FFFFFF"
+                      android:textSize="10sp"
+                      android:textStyle="italic" />
+                  <TextView
+                      android:id="@+id/w_achat_pct"
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:layout_marginStart="4dp"
+                      android:text="(+2,27 %)"
+                      android:textColor="#80FFFFFF"
+                      android:textSize="10sp"
+                      android:textStyle="italic" />
+              </LinearLayout>
 
               <TextView
                   android:id="@+id/w_c1"
@@ -945,6 +963,7 @@ jobs:
                           v.setTextViewText(R.id.w_f1, "");
                           v.setTextViewText(R.id.w_f5, "");
                           v.setTextViewText(R.id.w_achat, "");
+                          v.setTextViewText(R.id.w_achat_pct, "");
                           v.setTextViewText(R.id.w_c1, "");
                           v.setTextViewText(R.id.w_c2, "");
                           v.setTextViewText(R.id.w_c3, "");
@@ -965,6 +984,11 @@ jobs:
                           v.setTextViewText(R.id.w_f1, d.optString("f1", ""));
                           v.setTextViewText(R.id.w_f5, d.optString("f5", ""));
                           v.setTextViewText(R.id.w_achat, d.optString("achat", ""));
+                          v.setTextViewText(R.id.w_achat_pct, d.optString("achatVar", ""));
+                          String aCls = d.optString("achatCls", "doux");
+                          if (aCls.equals("vert")) v.setTextColor(R.id.w_achat_pct, android.graphics.Color.parseColor("#4CC27A"));
+                          else if (aCls.equals("rouge")) v.setTextColor(R.id.w_achat_pct, android.graphics.Color.parseColor("#EF7468"));
+                          else v.setTextColor(R.id.w_achat_pct, android.graphics.Color.parseColor("#80FFFFFF"));
                           v.setTextViewText(R.id.w_c1, d.optString("c1", ""));
                           v.setTextViewText(R.id.w_c2, d.optString("c2", ""));
                           v.setTextViewText(R.id.w_c3, d.optString("c3", ""));
@@ -980,6 +1004,7 @@ jobs:
                       v.setTextViewText(R.id.w_f1, "");
                       v.setTextViewText(R.id.w_f5, "");
                       v.setTextViewText(R.id.w_achat, "");
+                      v.setTextViewText(R.id.w_achat_pct, "");
                       v.setTextViewText(R.id.w_c1, "");
                       v.setTextViewText(R.id.w_c2, "");
                       v.setTextViewText(R.id.w_c3, "");
@@ -1000,6 +1025,7 @@ jobs:
                   v.setOnClickPendingIntent(R.id.w_f1, pi);
                   v.setOnClickPendingIntent(R.id.w_f5, pi);
                   v.setOnClickPendingIntent(R.id.w_achat, pi);
+                  v.setOnClickPendingIntent(R.id.w_achat_pct, pi);
                   v.setOnClickPendingIntent(R.id.w_c1, pi);
                   v.setOnClickPendingIntent(R.id.w_c2, pi);
                   v.setOnClickPendingIntent(R.id.w_c3, pi);
