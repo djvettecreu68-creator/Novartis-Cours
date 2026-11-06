@@ -78,6 +78,20 @@ button.secondaire{background:var(--bord);color:var(--txt)}
   </section>
 
   <section class="carte">
+    <div class="titre">🧠 L’avis de l’IA</div>
+    <div class="gros" id="iaTitre" style="font-size:1.5rem">—</div>
+    <div id="iaConseil" style="margin-top:6px"></div>
+    <div id="iaPourquoi" class="doux" style="margin-top:8px"></div>
+    <div id="iaVigilance" class="note"></div>
+    <div id="iaEtat" class="note"></div>
+    <div class="boutons"><button id="iaRelancer" class="secondaire">Redemander une analyse</button></div>
+    <label class="doux" style="display:flex;flex-direction:column;gap:4px;margin-top:14px">Pose ta question à l’IA<textarea id="iaQuestion" rows="2" maxlength="500" placeholder="ex. Pourquoi ça baisse aujourd’hui ?" style="font:inherit;border-radius:12px;border:1px solid var(--bord);padding:9px 11px;background:var(--carte);color:var(--txt)"></textarea></label>
+    <button id="iaDemander" style="margin-top:10px;width:100%">Demander</button>
+    <div id="iaReponse" style="margin-top:10px;white-space:pre-wrap"></div>
+    <div class="note">L’IA gratuite de Cloudflare lit les chiffres calculés par l’appli et les actus du jour. Elle explique, elle ne connaît pas l’avenir. Ton nombre de parts n’est pas envoyé.</div>
+  </section>
+
+  <section class="carte">
     <div class="titre">Le bon moment ?</div>
     <div class="gros" id="voyant">—</div>
     <div id="voyantTexte" class="doux"></div>
@@ -637,7 +651,7 @@ function afficherActus() {
 }
 
 function toutAfficher() {
-  [afficherFCPE, afficherCours, afficherReperes, afficherBacktest, dessiner, afficherActus, afficherAlertes, afficherVoyant, afficherBulletin].forEach(sur);
+  [afficherFCPE, afficherCours, afficherReperes, afficherBacktest, dessiner, afficherActus, afficherAlertes, afficherVoyant, afficherBulletin, afficherAvisIA].forEach(sur);
   maj(etatEntete());
 }
 
@@ -877,6 +891,95 @@ function afficherBulletin() {
     + (changements.length ? '<div style="margin-top:8px">Derniers changements : ' + changements.map(echapper).join(' · ') + '</div>' : '');
 }
 
+// ---------- Le cerveau IA (1.6) : l’IA gratuite de Cloudflare, via le serveur novartis-ia (les clés restent sur le serveur) ----------
+const IA_URL = 'https://novartis-ia.djvettecreu68.workers.dev';
+const CLE_IA = 'novartis.ia.analyse';
+const COULEURS_IA = { vert: '🟢', orange: '🟠', rouge: '🔴' };
+// réponse de l’IA → avis propre, ou null si elle est inutilisable
+function lireAvisIA(texte) {
+  let o;
+  try { o = typeof texte === 'string' ? JSON.parse(texte) : texte; } catch (e) { return null; }
+  if (!o || typeof o.titre !== 'string' || typeof o.conseil !== 'string') return null;
+  return {
+    couleur: COULEURS_IA[o.couleur] ? o.couleur : 'orange', titre: o.titre.slice(0, 80), conseil: o.conseil.slice(0, 400),
+    pourquoi: Array.isArray(o.pourquoi) ? o.pourquoi.filter((x) => typeof x === 'string').slice(0, 5).map((x) => x.slice(0, 300)) : [],
+    vigilance: typeof o.vigilance === 'string' ? o.vigilance.slice(0, 300) : '',
+    confiance: ['faible', 'moyenne', 'élevée'].includes(o.confiance) ? o.confiance : 'moyenne',
+  };
+}
+// tout ce que l’appli sait aujourd’hui, en chiffres, pour l’IA (ton nombre de parts n’est pas envoyé)
+function contexteIA() {
+  const d = etat.donnees || {}, r = (v, k) => (v == null || !isFinite(v) ? null : Math.round(v * Math.pow(10, k == null ? 2 : k)) / Math.pow(10, k == null ? 2 : k));
+  const ctx = { date: aujourdhui(), situation: 'Salarié de Novartis en France. Épargne en FCPE d’actionnariat salarié Novartis (Natixis Interépargne) : parts en principe bloquées 5 ans sauf cas de déblocage, vente au prix de la VL suivante, versements volontaires possibles avec abondement de l’employeur. Peut aussi acheter ou vendre des actions NVS sur un compte-titres.' };
+  const vlRef = lireNombre(localStorage.getItem(CLE.vlRef)), vlDate = localStorage.getItem(CLE.vlDate);
+  if (vlRef && vlDate && d.novn && d.eurchf) {
+    const f = calculFCPE(d, vlRef, vlDate);
+    if (!f.erreur) ctx.fcpe = { derniere_vl_eur: vlRef, date_vl: vlDate, vl_estimee_eur: r(f.vl), variation_depuis_vl_pct: r(f.variationPct) };
+  }
+  if (d.novn) {
+    const s = d.novn, c = s.c, n = c.length, an = c.slice(-SEANCES_AN), v = voyant(s.a), t = testerVoyant(s);
+    ctx.action_zurich = {
+      cours_chf: c[n - 1], seance: s.j[n - 1], variation_seance_pct: r(variationJour(s)), variation_1_mois_pct: r((c[n - 1] / c[Math.max(0, n - 22)] - 1) * 100),
+      variation_1_an_pct: r((c[n - 1] / an[0] - 1) * 100), plus_haut_1_an_chf: Math.max(...an), plus_bas_1_an_chf: Math.min(...an),
+      ecart_moyenne_200j_pct: n >= 200 ? r((c[n - 1] / sma(c, 200) - 1) * 100) : null, volatilite_annuelle_pct: r(volatiliteAnnuelle(c.slice(-(SEANCES_AN + 1))), 1),
+    };
+    if (v) ctx.voyant_technique = { couleur: v.couleur, verifications_ok_sur_4: v.score, rsi14: r(v.rsi, 0) };
+    if (t) ctx.bilan_voyant_5_ans = { depuis: t.depuis, suivre_le_voyant_pct: r(t.voyant.gainPct, 0), garder_pct: r(t.garde.gainPct, 0) };
+  }
+  if (d.nvs) ctx.nvs_new_york = { cours_usd: dernier(d.nvs.c), variation_seance_pct: r(variationJour(d.nvs)) };
+  if (d.eurchf) ctx.change = { eur_chf: dernier(d.eurchf.c), eur_usd: d.eurusd ? dernier(d.eurusd.c) : null };
+  if (d.actus) ctx.actualites = d.actus.liste.slice(0, 10).map((x) => ({ titre: x.titre, source: x.source, date: x.date ? new Date(x.date).toISOString().slice(0, 10) : null }));
+  return ctx;
+}
+async function appelerIA(chemin, corps) {
+  const rep = await fetch(IA_URL + chemin, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corps) });
+  const data = await rep.json().catch(() => ({ erreur: 'réponse illisible du serveur (' + rep.status + ')' }));
+  if (data.erreur) throw new Error(data.erreur);
+  return data;
+}
+function afficherAvisIA() {
+  const m = lireJSON(CLE_IA), a = m && lireAvisIA(m.avis);
+  if (!a) {
+    id('iaTitre').textContent = '—'; id('iaConseil').textContent = DANS_APPLI ? '' : 'L’IA marche seulement dans l’appli, sur le téléphone.';
+    id('iaPourquoi').innerHTML = ''; id('iaVigilance').textContent = '';
+    return;
+  }
+  id('iaTitre').textContent = COULEURS_IA[a.couleur] + ' ' + a.titre;
+  id('iaConseil').textContent = a.conseil;
+  id('iaPourquoi').innerHTML = a.pourquoi.map((x) => '• ' + echapper(x)).join('<br>');
+  id('iaVigilance').textContent = (a.vigilance ? '⚠️ ' + a.vigilance + ' ' : '') + '(confiance de l’IA : ' + a.confiance + ', analyse du ' + dateFR(m.jour) + ' à ' + m.heure + ')';
+}
+let iaEnCours = false;
+async function analyserIA(forcer) {
+  const d = etat.donnees, m = lireJSON(CLE_IA);
+  if (iaEnCours || !DANS_APPLI || !d || !d.novn) return;
+  if (!forcer && m && m.jour === aujourdhui() && m.seance === dernier(d.novn.j)) return; // une analyse par jour et par séance suffit
+  iaEnCours = true; id('iaRelancer').disabled = true;
+  id('iaEtat').textContent = '🧠 L’IA réfléchit… (jusqu’à une minute)';
+  try {
+    const r = await appelerIA('/analyse', { contexte: contexteIA() });
+    const a = lireAvisIA(r.avis);
+    if (!a) throw new Error('réponse de l’IA incomplète');
+    localStorage.setItem(CLE_IA, JSON.stringify({ avis: a, jour: aujourdhui(), heure: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }), seance: dernier(d.novn.j) }));
+    id('iaEtat').textContent = '';
+  } catch (e) {
+    id('iaEtat').textContent = 'L’IA n’a pas pu répondre : ' + e.message;
+  }
+  iaEnCours = false; id('iaRelancer').disabled = false;
+  sur(afficherAvisIA);
+}
+id('iaRelancer').onclick = () => analyserIA(true);
+id('iaDemander').onclick = async () => {
+  const q = id('iaQuestion').value.trim();
+  if (!q) { id('iaReponse').textContent = 'Écris ta question d’abord.'; return; }
+  if (!DANS_APPLI) { id('iaReponse').textContent = 'L’IA marche seulement dans l’appli, sur le téléphone.'; return; }
+  if (!etat.donnees || !etat.donnees.novn) { id('iaReponse').textContent = 'Attends que les cours soient chargés.'; return; }
+  id('iaDemander').disabled = true; id('iaReponse').textContent = '🧠 L’IA réfléchit…';
+  try { const r = await appelerIA('/question', { contexte: contexteIA(), question: q }); id('iaReponse').textContent = r.reponse; }
+  catch (e) { id('iaReponse').textContent = 'L’IA n’a pas pu répondre : ' + e.message; }
+  id('iaDemander').disabled = false;
+};
+
 // ---------- Mise à jour des cours ----------
 async function actualiser() {
   if (!DANS_APPLI) { maj(etatEntete()); return; }
@@ -902,6 +1005,7 @@ async function actualiser() {
   try { localStorage.setItem(CLE.donnees, JSON.stringify(d)); } catch (e) { }
   etat.enCours = false; id('actualiser').disabled = false;
   toutAfficher();
+  analyserIA(false);
 }
 
 // ---------- Boutons ----------
@@ -962,6 +1066,7 @@ etat.donnees = lireJSON(CLE.donnees);
 remplirChamps();
 toutAfficher();
 if (DANS_APPLI && (!etat.donnees || Date.now() - (etat.donnees.quand || 0) > 10 * 60000)) actualiser();
+else analyserIA(false);
 
 // ===== CONTRÔLE QUALITÉ — NE JAMAIS MODIFIER UN CAS POUR LE FAIRE PASSER =====
 const normaliserEspaces = (s) => String(s).replace(/[\u202f\u00a0\u2009]/g, ' ');
@@ -989,6 +1094,9 @@ function controleQualite() {
     ['Voyant : cours qui baisse tout le temps (349 → 100) → rouge, 1 sur 4', () => { const v = voyant(Array.from({ length: 250 }, (_, i) => 349 - i)); return v.couleur + ' ' + v.score; }, 'rouge 1'],
     ['Bulletin : vert puis 110, rouge puis 105, vert puis 120 → tout juste', () => { const b = bulletin([100, 110, 105, 120], ['vert', 'rouge', 'vert', null], 0, 1); return 'vert ' + b.vert.bons + '/' + b.vert.n + ' rouge ' + b.rouge.bons + '/' + b.rouge.n + ' hausses ' + b.tous.hausses + '/' + b.tous.n; }, 'vert 2/2 rouge 1/1 hausses 2/3'],
     ['Bulletin : feu vert suivi d’une baisse (100 → 90) → compté faux', () => { const b = bulletin([100, 90, 95], ['vert', 'vert', null], 0, 1); return b.vert.bons + '/' + b.vert.n; }, '1/2'],
+    ['Avis IA correct → feu vert gardé', () => lireAvisIA('{"couleur":"vert","titre":"Situation saine","conseil":"Garde tes parts.","pourquoi":["a"],"confiance":"moyenne"}').couleur, 'vert'],
+    ['Avis IA avec une couleur inconnue → orange par prudence', () => lireAvisIA('{"couleur":"violet","titre":"T","conseil":"C"}').couleur, 'orange'],
+    ['Réponse de l’IA qui n’est pas du JSON → ignorée', () => lireAvisIA('bonjour'), null],
   ];
   const ko = [];
   for (const [nom, f, attendu] of cas) {
