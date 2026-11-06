@@ -669,13 +669,16 @@ function majWidgetAppli() {
     const vlAchat = lireNombre(localStorage.getItem(CLE.vlAchat));
     
     let vlTxt = '— €', varTxt = '', varCls = 'doux', achatTxt = '';
-    if (vlAchat) achatTxt = 'Achat : ' + formaterNombre(vlAchat) + ' €';
+    const parts = lireNombre(localStorage.getItem(CLE.parts));
     if (r && !r.erreur) {
       vlTxt = formaterNombre(r.vl) + ' €';
-      let vp = r.variationPct;
-      if (vlAchat) vp = (r.vl / vlAchat - 1) * 100;
-      varTxt = pct(vp, 2);
-      varCls = vp > 0 ? 'vert' : (vp < 0 ? 'rouge' : 'doux');
+      varTxt = pct(r.variationPct, 2); // Variation par rapport à la dernière VL
+      varCls = r.variationPct > 0 ? 'vert' : (r.variationPct < 0 ? 'rouge' : 'doux');
+      if (vlAchat) {
+        const vp = (r.vl / vlAchat - 1) * 100;
+        const gain = parts ? parts * (r.vl - vlAchat) : null;
+        achatTxt = 'Achat : ' + formaterNombre(vlAchat) + ' € (' + pct(vp, 2) + (gain ? ' · ' + (gain > 0 ? '+' : '') + formaterNombre(gain) + ' €' : '') + ')';
+      }
     }
     
     const al = lireAlertes();

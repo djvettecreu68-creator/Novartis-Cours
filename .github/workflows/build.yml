@@ -579,15 +579,22 @@ jobs:
                   try {
                       String vlTxt = "— €", varTxt = "", varCls = "doux", achatTxt = "", alTxt = "", dirTitre = "", dirTexte = "", c1 = "", c2 = "", c3 = "", c4 = "", f1 = "", f5 = "";
                       double vlAchat = cfg.optDouble("vlAchat", 0);
-                      if (vlAchat > 0) achatTxt = "Achat : " + nombre(vlAchat) + " €";
+                      double vlRef = cfg.optDouble("vlRef", 0);
                       
                       if (vl != null) {
                           vlTxt = nombre(vl) + " €";
-                          double vRef = vlAchat > 0 ? vlAchat : cfg.optDouble("vlRef", 0);
-                          if (vRef > 0) {
-                              double var = (vl / vRef - 1) * 100;
+                          if (vlRef > 0) {
+                              double var = (vl / vlRef - 1) * 100;
                               varTxt = String.format(Locale.FRANCE, "%+.2f %%", var);
                               varCls = var > 0 ? "vert" : (var < 0 ? "rouge" : "doux");
+                          } else if (vlAchat > 0) {
+                              double var = (vl / vlAchat - 1) * 100;
+                              varTxt = String.format(Locale.FRANCE, "%+.2f %%", var);
+                              varCls = var > 0 ? "vert" : (var < 0 ? "rouge" : "doux");
+                          }
+                          if (vlAchat > 0) {
+                              double varA = (vl / vlAchat - 1) * 100;
+                              achatTxt = "Achat : " + nombre(vlAchat) + " € (" + String.format(Locale.FRANCE, "%+.2f %%", varA) + ")";
                           }
                       }
                       
