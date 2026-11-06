@@ -401,6 +401,7 @@ jobs:
                   for (String cle : new String[]{"vlBas", "vlHaut", "nvsBas", "nvsHaut"})
                       if (avant.optDouble(cle, -1) != apres.optDouble(cle, -1)) e.remove("dit_" + cle);
                   if (avant.optDouble("variation", -1) != apres.optDouble("variation", -1)) e.remove("jour_novn").remove("jour_nvs");
+                  if (avant.optBoolean("voyant", false) != apres.optBoolean("voyant", false)) e.remove("voyant_couleur").remove("voyant_jour");
                   e.apply();
                   planifier(c, apres.optBoolean("actif", false));
               }
@@ -523,6 +524,7 @@ jobs:
                   seuil(c, sp, cfg, "nvsHaut", nvs.dernier(), false, "NVS", "$", 104);
                   mouvement(c, sp, cfg, "novn", "Novartis à Zurich", novn, 105);
                   mouvement(c, sp, cfg, "nvs", "NVS à New York", nvs, 106);
+                  voyant(c, sp, cfg, m, minutes, force, bilan);
                   sp.edit().putString("bilan", bilan.toString()).putString("erreur", "").putString("dejaSignale", "").apply();
               }
 
@@ -548,6 +550,46 @@ jobs:
                   String jour = s.jour().substring(8, 10) + "/" + s.jour().substring(5, 7);
                   notifier(c, id, nom + " : " + (v > 0 ? "+" : "") + nombre(v) + " %", "Séance du " + jour + ". Ton seuil : ±" + nombre(limite) + " %.");
                   sp.edit().putString("jour_" + cle, s.jour()).apply();
+              }
+
+              /** Le voyant : 4 vérifications sur l'action à Zurich, mêmes règles que l'écran. null si pas assez d'historique. */
+              static String couleurVoyant(ArrayList<Double> a) {
+                  int n = a.size();
+                  if (n < 200) return null;
+                  double p = a.get(n - 1), m50 = 0, m200 = 0;
+                  for (int i = n - 50; i < n; i++) m50 += a.get(i);
+                  for (int i = n - 200; i < n; i++) m200 += a.get(i);
+                  m50 /= 50;
+                  m200 /= 200;
+                  int debut = Math.max(0, n - 250), k = 14;
+                  double g = 0, q = 0;
+                  for (int i = debut + 1; i <= debut + k; i++) { double d = a.get(i) - a.get(i - 1); if (d > 0) g += d; else q -= d; }
+                  g /= k;
+                  q /= k;
+                  for (int i = debut + k + 1; i < n; i++) { double d = a.get(i) - a.get(i - 1); g = (g * (k - 1) + (d > 0 ? d : 0)) / k; q = (q * (k - 1) + (d < 0 ? -d : 0)) / k; }
+                  double rsi = q == 0 ? (g == 0 ? 50 : 100) : 100 - 100 / (1 + g / q);
+                  int score = (p > m200 ? 1 : 0) + (m50 > m200 ? 1 : 0) + (p > m50 ? 1 : 0) + (rsi < 70 ? 1 : 0);
+                  return score >= 3 ? "vert" : (score == 2 ? "orange" : "rouge");
+              }
+
+              /** Chaque soir après la clôture de Zurich (17h45) : prévient si le voyant change de couleur. */
+              static void voyant(Context c, SharedPreferences sp, JSONObject cfg, java.time.ZonedDateTime m, int minutes, boolean force, StringBuilder bilan) throws Exception {
+                  if (!cfg.optBoolean("voyant", false)) return;
+                  String aujourdhui = m.toLocalDate().toString();
+                  if (!force && (minutes < 17 * 60 + 45 || aujourdhui.equals(sp.getString("voyant_jour", "")))) return;
+                  String couleur = couleurVoyant(charger("NOVN.SW", "1y").a);
+                  if (couleur == null) return;
+                  bilan.append(" · voyant ").append(couleur);
+                  String avant = sp.getString("voyant_couleur", "");
+                  if (!avant.isEmpty() && !avant.equals(couleur)) {
+                      String[] t = couleur.equals("vert") ? new String[]{"🟢 Novartis : feu vert", "Les vérifications sont bonnes : plutôt un bon moment pour acheter ou garder."}
+                              : couleur.equals("orange") ? new String[]{"🟠 Novartis : feu orange", "Signaux mélangés : plutôt attendre."}
+                              : new String[]{"🔴 Novartis : feu rouge", "Tendance défavorable : plutôt pas le moment d'acheter."};
+                      notifier(c, 107, t[0], t[1] + " (avant : feu " + avant + ")");
+                  }
+                  SharedPreferences.Editor e = sp.edit().putString("voyant_couleur", couleur);
+                  if (!force) e.putString("voyant_jour", aujourdhui);
+                  e.apply();
               }
 
               static void notifier(Context c, int id, String titre, String texte) {
